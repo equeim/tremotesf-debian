@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+
+SPDX-License-Identifier: CC0-1.0
+-->
+
+<component type="desktop-application">
+  <id>org.equeim.Tremotesf</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0+</project_license>
+
+  <name>Tremotesf</name>
+  <summary>Remote GUI for Transmission BitTorrent client</summary>
+
+  <description>
+    <p>
+      Tremotesf is a remote GUI for Transmission BitTorrent client. You can fully control your transmission-daemon
+      instance, manage torrents, set Transmission settings, view server statistics.
+    </p>
+    <p>
+      You can add several servers profiles and switch between them (only one can be connected at a time).
+      Tremotesf has support of HTTPS, including self-signed certificates and client certificate authentication.
+      You can set mounted directories for servers and quickly open torrents' files and choose download directory
+      from file dialog.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">org.equeim.Tremotesf.desktop</launchable>
+  <provides>
+    <binary>tremotesf</binary>
+  </provides>
+
+  <screenshots>
+    <screenshot type="default">
+      <image>https://github.com/equeim/tremotesf-screenshots/raw/master/desktop-1.png</image>
+    </screenshot>
+    <screenshot>
+      <image>https://github.com/equeim/tremotesf-screenshots/raw/master/desktop-2.png</image>
+    </screenshot>
+    <screenshot>
+      <image>https://github.com/equeim/tremotesf-screenshots/raw/master/desktop-3.png</image>
+    </screenshot>
+    <screenshot>
+      <image>https://github.com/equeim/tremotesf-screenshots/raw/master/desktop-4.png</image>
+    </screenshot>
+  </screenshots>
+
+  <url type="homepage">https://github.com/equeim/tremotesf2</url>
+  <url type="bugtracker">https://github.com/equeim/tremotesf2/issues</url>
+  <url type="translate">https://www.transifex.com/equeim/tremotesf</url>
+
+  <developer_name>Alexey Rochev</developer_name>
+
+  <releases>
+    <release date="2023-05-30" version="2.4.0">
+      <description>
+        <p>Added</p>
+        <ul>
+          <li>"Add torrent" dialog now has checkbox to remove torrent file when torrent is added</li>
+        </ul>
+        <p>Changed</p>
+        <ul>
+          <li>"Remember last download directory" is replaced with "Remember parameters of last added torrent", which also remembers priority, started/paused state and "Delete .torrent file" checkbox of last added torrent</li>
+          <li>"Remember last torrent open directory" setting is renamed to "Remember location of last opened torrent file"</li>
+          <li>When "Remember last torrent open directory" is unchecked user's home directory is always used</li>
+          <li>When authentication is enabled, `Authorization` header will be sent in advance instead of waiting for 401 response from server (thanks @otaconix)</li>
+        </ul>
+        <p>Fixed</p>
+        <ul>
+          <li>Errors when opening certain torrent files</li>
+          <li>Incorrect error message being displayed when there is no configured servers</li>
+        </ul>
+      </description>
+    </release>
+    <release date="2023-04-30" version="2.3.0">
+      <description>
+        <p>Fixed</p>
+        <ul>
+          <li>Crash on launch with some Qt styles</li>
+          <li>Mounted directories feature not working on Windows with UNC paths</li>
+          <li>Incorrect error message when adding torrent that already exists with some Transmission
+            versions
+          </li>
+        </ul>
+      </description>
+    </release>
+    <release date="2023-03-28" version="2.2.0">
+      <description>
+        <p>Added</p>
+        <ul>
+          <li>Torrent priority selection in torrent's context menu</li>
+        </ul>
+        <p>Changed</p>
+        <ul>
+          <li>Torrent status icons are redrawn to be more contrasting</li>
+        </ul>
+        <p>Fixed</p>
+        <ul>
+          <li>Torrent status icons being pixelated on high DPI displays</li>
+          <li>Torrent priority column being empty</li>
+          <li>Zero number of leechers</li>
+          <li>No icon in task switcher in KDE Plasma Wayland</li>
+        </ul>
+      </description>
+    </release>
+    <release date="2023-03-12" version="2.1.0">
+      <description>
+        <p>Added</p>
+        <ul>
+          <li>Trackers list shows number of seeders and leechers for trackers, not just total number peers
+          </li>
+        </ul>
+        <p>Changed</p>
+        <ul>
+          <li>"Seeders" and "leechers" now refer to total number of seeders and leechers reported by trackers,
+            while number of peers that we are currently downloading from / uploading to is displayed
+            separately
+          </li>
+          <li>Tracker's error is displayed in separate column</li>
+          <li>Torrents that have an error but are still being downloaded/uploaded are displayed under both
+            "Status" filters simultaneously
+          </li>
+        </ul>
+        <p>Fixed</p>
+        <ul>
+          <li>Fixed issues with lists or torrents/trackers not being updated sometimes</li>
+          <li>Main window placeholder when there is no torrents in list is now displayed correctly</li>
+        </ul>
+      </description>
+    </release>
+    <release date="2022-11-05" version="2.0.0"/>
+    <release date="2022-03-18" version="1.11.3"/>
+    <release date="2022-03-16" version="1.11.2"/>
+    <release date="2022-02-28" version="1.11.1"/>
+    <release date="2022-02-13" version="1.11.0"/>
+    <release date="2021-09-27" version="1.10.0"/>
+    <release date="2021-05-10" version="1.9.1"/>
+    <release date="2021-05-04" version="1.9.0"/>
+    <release date="2020-09-06" version="1.8.0"/>
+    <release date="2020-06-27" version="1.7.1"/>
+    <release date="2020-06-05" version="1.7.0"/>
+    <release date="2020-01-11" version="1.6.4"/>
+    <release date="2020-01-05" version="1.6.3"/>
+    <release date="2020-01-05" version="1.6.2"/>
+    <release date="2019-07-16" version="1.6.1"/>
+    <release date="2019-01-26" version="1.6.0"/>
+    <release date="2018-12-08" version="1.5.6"/>
+    <release date="2018-09-26" version="1.5.5"/>
+    <release date="2018-09-10" version="1.5.4"/>
+    <release date="2018-09-03" version="1.5.3"/>
+  </releases>
+
+  <content_rating type="oars-1.1"/>
+</component>

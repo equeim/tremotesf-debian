@@ -1,0 +1,19 @@
+<!--
+SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+
+SPDX-License-Identifier: CC0-1.0
+-->
+
+<RCC>
+    <qresource prefix="/">
+        <file>active.svg</file>
+        <file>checking.svg</file>
+        <file>downloading.svg</file>
+        <file>errored.svg</file>
+        <file>paused.svg</file>
+        <file>queued.svg</file>
+        <file>seeding.svg</file>
+        <file>stalled-downloading.svg</file>
+        <file>stalled-seeding.svg</file>
+    </qresource>
+</RCC>

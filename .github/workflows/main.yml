@@ -1,0 +1,257 @@
+# SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+#
+# SPDX-License-Identifier: CC0-1.0
+
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches:
+      - master
+      - 'feature/**'
+  schedule:
+    - cron: '0 0 * * 0'
+
+jobs:
+  build-rpm:
+    strategy:
+      fail-fast: false
+      matrix:
+        container-image: ['fedora:37', 'fedora:38', 'opensuse/tumbleweed:latest', 'mageia:8']
+        compiler: [gcc]
+        include:
+        - container-image: 'fedora:37'
+          compiler: clang
+        - container-image: 'fedora:38'
+          compiler: clang
+
+    runs-on: ubuntu-latest
+    container: ${{ matrix.container-image }}
+
+    steps:
+    - name: Add GCC problem matcher
+      uses: ammaraskar/gcc-problem-matcher@master
+
+    - name: Set packages install command for dnf
+      if: startsWith(matrix.container-image, 'fedora') || startsWith(matrix.container-image, 'mageia')
+      run: echo 'INSTALL_PACKAGES=dnf -y --setopt=install_weak_deps=False install' >> "$GITHUB_ENV"
+
+    - name: Set packages install command for zypper
+      if: startsWith(matrix.container-image, 'opensuse')
+      run: echo 'INSTALL_PACKAGES=zypper --non-interactive in --no-recommends' >> "$GITHUB_ENV"
+
+    - name: Install Git and rpm-build
+      run: ${{env.INSTALL_PACKAGES}} git rpm-build
+
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        submodules: 'recursive'
+
+    - name: Set Fedora compiler RPM macro
+      id: fedora-compiler
+      if: startsWith(matrix.container-image, 'fedora')
+      run: echo "rpm-macro=--define 'toolchain ${{ matrix.compiler }}'" >> "$GITHUB_OUTPUT"
+
+    - name: Install build dependencies
+      run: |
+        readarray -t dependencies < <(rpmspec ${{steps.fedora-compiler.outputs.rpm-macro}} -q --srpm --qf '[%{REQUIRES}\n]' rpm/tremotesf.spec)
+        ${{env.INSTALL_PACKAGES}} "${dependencies[@]}"
+
+    - name: Make source archive
+      run: |
+        # Git complains if we don't do that
+        git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+        sourcedir="$(rpmbuild --eval '%_sourcedir')"
+        mkdir -p "$sourcedir"
+        .github/workflows/make-source-archive.py --output-directory "$sourcedir" zstd
+
+    - name: Build RPM
+      run: rpmbuild ${{steps.fedora-compiler.outputs.rpm-macro}} -bb rpm/tremotesf.spec
+
+  build-deb:
+    strategy:
+      fail-fast: false
+      matrix:
+        container-image: ['debian:11', 'debian:bookworm', 'ubuntu:22.04', 'ubuntu:23.04']
+
+    runs-on: ubuntu-latest
+    container: ${{ matrix.container-image }}
+
+    steps:
+    - name: Add GCC problem matcher
+      uses: ammaraskar/gcc-problem-matcher@master
+
+    - name: Install Git
+      run: |
+        apt-get update && DEBIAN_FRONTEND=noninteractive apt-get --no-install-recommends --assume-yes install ca-certificates git
+
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        submodules: 'recursive'
+
+    - name: Install build dependencies
+      run: |
+        apt-get update && DEBIAN_FRONTEND=noninteractive apt-get --no-install-recommends --assume-yes build-dep .
+
+    - name: Make source archive
+      run: |
+        # Git complains if we don't do that
+        git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+        .github/workflows/make-source-archive.py --output-directory .. --debian gzip
+
+    - name: Build DEB
+      run: |
+        dpkg-buildpackage
+
+  build-freebsd:
+    strategy:
+      fail-fast: false
+      matrix:
+        freebsd-version: ['12', '13']
+    env:
+      FREEBSD_VERSION: ${{ matrix.freebsd-version }}
+
+    runs-on: macos-latest
+    steps:
+    - name: Add GCC problem matcher
+      uses: ammaraskar/gcc-problem-matcher@master
+
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        submodules: 'recursive'
+
+    - name: Start FreeBSD VM
+      run: |
+        echo '::group::Starting VM'
+        VAGRANT_CWD="$GITHUB_WORKSPACE/src/libtremotesf/.github/workflows" vagrant up --provider=virtualbox
+        echo '::endgroup'
+        echo '::group::Adding vagrant shell to PATH'
+        echo "$GITHUB_WORKSPACE/src/libtremotesf/.github/workflows" >> "$GITHUB_PATH"
+        echo '::endgroup'
+
+    - name: Install dependencies
+      shell: vagrant-freebsd-shell.sh {0}
+      run: |
+        # Switch from latest to quarterly repo
+        sudo rm /usr/local/etc/pkg/repos/FreeBSD.conf
+        sudo pkg update -f
+        sudo pkg install -y cmake ninja pkgconf libpsl libfmt cpp-httplib qt5-buildtools qt5-qmake qt5-core qt5-network qt5-concurrent qt5-testlib qt5-widgets qt5-dbus kf5-kwidgetsaddons kf5-kwindowsystem gettext-tools cxxopts
+
+    - name: Build for FreeBSD
+      shell: vagrant-freebsd-shell.sh {0}
+      run: |
+        set -e -o pipefail
+        echo '::group::Configuring CMake'
+        cmake -S . --preset base
+        echo '::endgroup'
+        echo '::group::Building Debug'
+        cmake --build --preset base-debug
+        echo '::endgroup'
+        echo '::group::Testing Debug'
+        ctest --preset base-debug
+        echo '::endgroup'
+        echo '::group::Building Release'
+        cmake --build --preset base-release
+        echo '::endgroup'
+        echo '::group::Testing Release'
+        ctest --preset base-release
+        echo '::endgroup'
+
+  build-flatpak:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Add GCC problem matcher
+      uses: ammaraskar/gcc-problem-matcher@master
+
+    - name: Set up Flatpak
+      run: |
+        sudo add-apt-repository -y ppa:flatpak/stable
+        sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get --no-install-recommends --assume-yes install flatpak flatpak-builder elfutils
+        flatpak remote-add --user --if-not-exists flathub 'https://flathub.org/repo/flathub.flatpakrepo'
+
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        submodules: 'recursive'
+
+    - name: Build Tremotesf
+      run: |
+        flatpak-builder --user --install-deps-from=flathub build-dir org.equeim.Tremotesf.json
+
+  build-windows-msvc:
+    uses: ./.github/workflows/build-windows-msvc.yml
+
+  build-windows-mingw:
+    runs-on: windows-latest
+
+    steps:
+    - name: Add GCC problem matcher
+      uses: ammaraskar/gcc-problem-matcher@master
+
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        submodules: 'recursive'
+
+    - name: Set up MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: 'CLANG64'
+        update: 'true'
+        install: |
+          mingw-w64-clang-x86_64-clang
+          mingw-w64-clang-x86_64-cmake
+          mingw-w64-clang-x86_64-cppwinrt
+          mingw-w64-clang-x86_64-fmt
+          mingw-w64-clang-x86_64-openssl
+          mingw-w64-clang-x86_64-pkgconf
+          mingw-w64-clang-x86_64-qt5-base
+          mingw-w64-clang-x86_64-qt5-svg
+          mingw-w64-clang-x86_64-qt5-tools
+          mingw-w64-clang-x86_64-qt5-translations
+          mingw-w64-clang-x86_64-kwidgetsaddons-qt5
+          mingw-w64-clang-x86_64-cxxopts
+
+    - name: Generate C++/WinRT headers
+      shell: msys2 {0}
+      run: |
+          cppwinrt -input sdk -output /clang64/include
+
+    - name: Build with LLVM MinGW toolchain
+      shell: msys2 {0}
+      run: |
+          set -e -o pipefail
+          echo '::group::Configuring CMake'
+          cmake -S . --preset base
+          echo '::endgroup'
+          echo '::group::Building Debug'
+          cmake --build --preset base-debug
+          echo '::endgroup'
+          echo '::group::Testing Debug'
+          ctest --preset base-debug
+          echo '::endgroup'
+          echo '::group::Building Release'
+          cmake --build --preset base-release
+          echo '::endgroup'
+          echo '::group::Testing Release'
+          ctest --preset base-release
+          echo '::endgroup'
+
+  reuse-lint:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out
+      uses: actions/checkout@v3
+
+    - name: Check REUSE compliance
+      run: |
+        sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get --no-install-recommends --assume-yes install pipx
+        pipx run reuse lint

@@ -1,0 +1,60 @@
+# SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+#
+# SPDX-License-Identifier: CC0-1.0
+
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  upload-source-archives:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        submodules: 'recursive'
+
+    - name: Upload source archives to release
+      run: |
+        readarray -t archives < <(.github/workflows/make-source-archive.py all)
+        echo "Uploading source archives ${archives[@]}"
+        gh release upload '${{ github.event.release.tag_name }}' "${archives[@]}"
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  upload-debian-source-package:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        submodules: 'recursive'
+
+    - name: Make source package
+      id: make-source-package
+      run: |
+        .github/workflows/make-source-archive.py --output-directory .. --debian gzip
+        dpkg-buildpackage --build=source --no-pre-clean
+
+    - name: Upload source package to release
+      run: |
+        shopt -s failglob
+        cd ..
+        files=(tremotesf_*.debian.* tremotesf_*.dsc tremotesf_*.orig.*)
+        archive_filename="$(basename tremotesf_*.dsc .dsc)-debian-source.tar.gz"
+        echo "Archiving ${files[@]} to $archive_filename"
+        tar --create --gzip --file "$archive_filename" "${files[@]}"
+        echo "Uploading artifact $archive_filename"
+        gh release upload --repo '${{ github.repository }}' '${{ github.event.release.tag_name }}' "$archive_filename"
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-windows-msvc:
+    uses: ./.github/workflows/build-windows-msvc.yml
+    with:
+      build-for-release: ${{ github.event.release.tag_name }}

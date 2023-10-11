@@ -1,0 +1,23 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg/master/scripts/vcpkg.schema.json",
+  "name": "tremotesf",
+  "version": "0",
+  "dependencies": [
+    {
+        "name": "qt5-base",
+        "default-features": false
+    },
+    "qt5-tools",
+    "qt5-translations",
+    "qt5-svg",
+    "fmt",
+    "openssl",
+    "kf5widgetsaddons",
+    {
+      "name": "pkgconf",
+      "platform": "windows"
+    },
+    "cxxopts",
+    "cpp-httplib"
+  ]
+}

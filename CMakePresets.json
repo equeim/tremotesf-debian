@@ -1,0 +1,196 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "base",
+      "displayName": "Base",
+      "generator": "Ninja Multi-Config",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "installDir": "${sourceDir}/out/install/${presetName}",
+      "warnings": {
+        "dev": true,
+        "deprecated": true
+      },
+      "cacheVariables": {
+        "CMAKE_CONFIGURATION_TYPES": "Debug;Release;RelWithDebInfo"
+      }
+    },
+    {
+      "name": "windows-msvc-vcpkg",
+      "displayName": "Windows with MSVC toolchain and vcpkg",
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "cacheVariables": {
+        "CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE": "ON",
+        "VCPKG_INSTALLED_DIR": "${sourceDir}/vcpkg-installed",
+        "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/src/libtremotesf/vcpkg-windows-overlay-triplets",
+        "VCPKG_TARGET_TRIPLET": "x64-windows-static",
+        "VCPKG_HOST_TRIPLET": "x64-windows-static",
+        "VCPKG_INSTALL_OPTIONS": "--disable-metrics;--clean-buildtrees-after-build;--clean-packages-after-build"
+      },
+      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+      "vendor": {
+        "microsoft.com/VisualStudioSettings/CMake/1.0": {
+          "hostOS": [
+            "Windows"
+          ]
+        }
+      }
+    },
+    {
+      "name": "windows-msvc-clang-vcpkg",
+      "displayName": "Windows with MSVC + Clang toolchain and vcpkg",
+      "inherits": "windows-msvc-vcpkg",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "clang-cl.exe"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "base-debug",
+      "displayName": "Debug",
+      "configurePreset": "base",
+      "configuration": "Debug"
+    },
+    {
+      "name": "base-release",
+      "displayName": "Release",
+      "configurePreset": "base",
+      "configuration": "Release"
+    },
+    {
+      "name": "base-relwithdebinfo",
+      "displayName": "RelWithDebInfo",
+      "configurePreset": "base",
+      "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "windows-msvc-vcpkg-debug",
+      "displayName": "Debug",
+      "configurePreset": "windows-msvc-vcpkg",
+      "configuration": "Debug"
+    },
+    {
+      "name": "windows-msvc-vcpkg-release",
+      "displayName": "Release",
+      "configurePreset": "windows-msvc-vcpkg",
+      "configuration": "Release"
+    },
+    {
+      "name": "windows-msvc-vcpkg-relwithdebinfo",
+      "displayName": "RelWithDebInfo",
+      "configurePreset": "windows-msvc-vcpkg",
+      "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "windows-msvc-clang-vcpkg-debug",
+      "displayName": "Debug",
+      "configurePreset": "windows-msvc-clang-vcpkg",
+      "configuration": "Debug"
+    },
+    {
+      "name": "windows-msvc-clang-vcpkg-release",
+      "displayName": "Release",
+      "configurePreset": "windows-msvc-clang-vcpkg",
+      "configuration": "Release"
+    },
+    {
+      "name": "windows-msvc-clang-vcpkg-relwithdebinfo",
+      "displayName": "RelWithDebInfo",
+      "configurePreset": "windows-msvc-clang-vcpkg",
+      "configuration": "RelWithDebInfo"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "base-debug",
+      "displayName": "Debug",
+      "configurePreset": "base",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "base-release",
+      "displayName": "Release",
+      "configurePreset": "base",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "base-relwithdebinfo",
+      "displayName": "RelWithDebInfo",
+      "configurePreset": "base",
+      "configuration": "RelWithDebInfo",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-msvc-vcpkg-debug",
+      "displayName": "Debug",
+      "configurePreset": "windows-msvc-vcpkg",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-msvc-vcpkg-release",
+      "displayName": "Release",
+      "configurePreset": "windows-msvc-vcpkg",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-msvc-vcpkg-relwithdebinfo",
+      "displayName": "RelWithDebInfo",
+      "configurePreset": "windows-msvc-vcpkg",
+      "configuration": "RelWithDebInfo",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-msvc-clang-vcpkg-debug",
+      "displayName": "Debug",
+      "configurePreset": "windows-msvc-clang-vcpkg",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-msvc-clang-vcpkg-release",
+      "displayName": "Release",
+      "configurePreset": "windows-msvc-clang-vcpkg",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-msvc-clang-vcpkg-relwithdebinfo",
+      "displayName": "RelWithDebInfo",
+      "configurePreset": "windows-msvc-clang-vcpkg",
+      "configuration": "RelWithDebInfo",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

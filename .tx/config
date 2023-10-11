@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+#
+# SPDX-License-Identifier: CC0-1.0
+
+[main]
+host = https://www.transifex.com
+
+[o:equeim:p:tremotesf:r:desktop]
+file_filter = data/po/<lang>.po
+source_file = data/po/messages.po
+source_lang = en
+type        = PO
+trans.en_US = data/po/en.po
+
+[o:equeim:p:tremotesf:r:main]
+file_filter = translations/<lang>.ts
+source_file = translations/source.ts
+source_lang = en
+type        = QT
+trans.en_US = translations/en.ts
+

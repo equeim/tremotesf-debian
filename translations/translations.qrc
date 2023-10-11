@@ -1,0 +1,20 @@
+<!--
+SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+
+SPDX-License-Identifier: CC0-1.0
+-->
+
+<RCC>
+    <qresource prefix="/">
+        <file>translations/en.qm</file>
+        <file>translations/es.qm</file>
+        <file>translations/fr.qm</file>
+        <file>translations/it_IT.qm</file>
+        <file>translations/nl_BE.qm</file>
+        <file>translations/nl.qm</file>
+        <file>translations/pl.qm</file>
+        <file>translations/ru.qm</file>
+        <file>translations/zh_CN.qm</file>
+    </qresource>
+</RCC>
+ 
