@@ -22,6 +22,9 @@ License: GPL-3+
  On Debian systems, the complete text of the GNU General
  Public License version 3 can be found in "/usr/share/common-licenses/GPL-3".
 
-Files: data/desktop/org.equeim.Tremotesf.appdata.xml.in
+Files: data/org.equeim.Tremotesf.appdata.xml.in
 Copyright: 2019 Alexey Rochev <equeim@gmail.com>
 License: CC0-1.0
+ On debian systems, the full text of the CC0 License version 1.0 can be found
+ in the file
+ /usr/share/common-licenses/CC0-1.0
