@@ -1,2 +1,4 @@
-# You must remove unused comment lines for the released package.
-version=3
+version=4
+opts="filenamemangle=s%(?:.*?)?v?@ANY_VERSION@(@ARCHIVE_EXT@)%@PACKAGE@-$1$2%" \
+      https://github.com/equeim/tremotesf2/tags \
+      (?:.*?/)?v?@ANY_VERSION@@ARCHIVE_EXT@

@@ -1,9 +1,8 @@
 Source: tremotesf
-Maintainer: Alexey Rochev <equeim@gmail.com>
+Maintainer: Antoine Beaupré <anarcat@debian.org>
 Section: net
 Priority: optional
 Build-Depends: cmake,
-               debhelper (>= 12),
                debhelper-compat (= 13),
                dh-cmake,
                dh-cmake-compat (= 1),
@@ -11,6 +10,7 @@ Build-Depends: cmake,
                dh-sequence-ctest,
                g++,
                gettext,
+               libcpp-httplib-dev,
                libcxxopts-dev,
                libfmt-dev,
                libkf5widgetsaddons-dev,
@@ -20,12 +20,33 @@ Build-Depends: cmake,
                ninja-build,
                pkgconf,
                qtbase5-dev,
-               qttools5-dev
+               qttools5-dev,
 Standards-Version: 4.6.2
 Homepage: https://github.com/equeim/tremotesf2
-Vcs-Git: https://github.com/equeim/tremotesf2.git
 
 Package: tremotesf
 Architecture: any
-Depends: ${misc:Depends}, ${shlibs:Depends}
+Depends: ${misc:Depends}, ${shlibs:Depends},
+Suggests: transmission-daemon,
 Description: Remote GUI for transmission-daemon
+ Tremotesf is yet another, but modern (first-released in 2016)
+ cross-platfom GUI for Transmission daemon written in C++ and Qt.
+ .
+ Features include, but not necessarily limited to:
+  * View torrent list
+  * Sort torrents
+  * Filter torrents by name, status and trackers
+  * Start/stop/verify/remove torrents with multi-selection
+  * Add torrents from torrent files and magnet links
+  * Select which files to download when adding torrent
+  * Manage torrent files
+  * Add and remove torrent trackers
+  * View torrent peers
+  * Set torrent limits
+  * Change remote server settings
+  * View server statistics
+  * Multiple servers
+  * Supports HTTPS connection
+  * Can connect to servers with self-signed certificates (you need to add
+    certificate to server settings)
+  * Client certificate authentication
