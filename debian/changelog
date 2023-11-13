@@ -1,5 +1,13 @@
+tremotesf (2.5.0-1) unstable; urgency=medium
+
+  * New upstream release: upstream started work on Qt6 but not enabled by
+    default, so we're sticking with Qt5 for now
+
+ -- Antoine Beaupré <anarcat@debian.org>  Mon, 13 Nov 2023 10:22:32 -0500
+
 tremotesf (2.4.0-1) unstable; urgency=medium
 
   * Initial packaging (Closes: #1053805)
 
  -- Antoine Beaupré <anarcat@debian.org>  Wed, 11 Oct 2023 12:03:24 -0400
+
