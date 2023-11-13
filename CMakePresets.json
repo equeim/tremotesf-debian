@@ -29,9 +29,10 @@
         "strategy": "external"
       },
       "cacheVariables": {
+        "TREMOTESF_QT6": "ON",
         "CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE": "ON",
         "VCPKG_INSTALLED_DIR": "${sourceDir}/vcpkg-installed",
-        "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/src/libtremotesf/vcpkg-windows-overlay-triplets",
+        "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/vcpkg-windows-overlay-triplets",
         "VCPKG_TARGET_TRIPLET": "x64-windows-static",
         "VCPKG_HOST_TRIPLET": "x64-windows-static",
         "VCPKG_INSTALL_OPTIONS": "--disable-metrics;--clean-buildtrees-after-build;--clean-packages-after-build"
