@@ -1,0 +1,51 @@
+// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+//
+// SPDX-License-Identifier: CC0-1.0
+
+#include <winresrc.h>
+
+#define TREMOTESF_ICON 0
+TREMOTESF_ICON ICON tremotesf.ico
+
+#define TORRENT_FILE_FRIENDLY_TYPE_NAME 0
+#define MAGNET_LINK_FRIENDLY_TYPE_NAME 1
+STRINGTABLE {
+    TORRENT_FILE_FRIENDLY_TYPE_NAME, "Torrent file"
+    MAGNET_LINK_FRIENDLY_TYPE_NAME, "Magnet link"
+}
+
+#ifdef _DEBUG
+#define TREMOTESF_FILEFLAGS VS_FF_DEBUG
+#else
+#define TREMOTESF_FILEFLAGS 0
+#endif
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION    	@PROJECT_VERSION_MAJOR@,@PROJECT_VERSION_MINOR@,@PROJECT_VERSION_PATCH@,0
+PRODUCTVERSION 	@PROJECT_VERSION_MAJOR@,@PROJECT_VERSION_MINOR@,@PROJECT_VERSION_PATCH@,0
+FILEFLAGSMASK  	VS_FFI_FILEFLAGSMASK
+FILEFLAGS      	TREMOTESF_FILEFLAGS
+FILEOS         	VOS__WINDOWS32
+FILETYPE       	VFT_APP
+FILESUBTYPE    	VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName",      "Tremotesf"
+            VALUE "FileDescription",  "Tremotesf - Remote GUI for transmission-daemon"
+            VALUE "FileVersion",      "@PROJECT_VERSION@"
+            VALUE "InternalName",     "@TREMOTESF_EXECUTABLE_NAME@"
+            VALUE "LegalCopyright",   "Copyright 2015-2023 Alexey Rochev"
+            VALUE "OriginalFilename", "@TREMOTESF_EXECUTABLE_NAME@.exe"
+            VALUE "ProductName",      "@TREMOTESF_APP_NAME@"
+            VALUE "ProductVersion",   "@PROJECT_VERSION@"
+        END
+    END
+
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

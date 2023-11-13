@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        container-image: ['fedora:37', 'fedora:38', 'opensuse/tumbleweed:latest', 'mageia:8']
+        container-image: ['fedora:37', 'fedora:38', 'opensuse/tumbleweed:latest']
         compiler: [gcc]
         include:
         - container-image: 'fedora:37'
@@ -35,7 +35,7 @@ jobs:
       uses: ammaraskar/gcc-problem-matcher@master
 
     - name: Set packages install command for dnf
-      if: startsWith(matrix.container-image, 'fedora') || startsWith(matrix.container-image, 'mageia')
+      if: startsWith(matrix.container-image, 'fedora')
       run: echo 'INSTALL_PACKAGES=dnf -y --setopt=install_weak_deps=False install' >> "$GITHUB_ENV"
 
     - name: Set packages install command for zypper
@@ -46,7 +46,7 @@ jobs:
       run: ${{env.INSTALL_PACKAGES}} git rpm-build
 
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         submodules: 'recursive'
 
@@ -76,7 +76,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        container-image: ['debian:11', 'debian:bookworm', 'ubuntu:22.04', 'ubuntu:23.04']
+        container-image: ['debian:11', 'debian:12', 'ubuntu:22.04', 'ubuntu:23.04']
 
     runs-on: ubuntu-latest
     container: ${{ matrix.container-image }}
@@ -90,7 +90,7 @@ jobs:
         apt-get update && DEBIAN_FRONTEND=noninteractive apt-get --no-install-recommends --assume-yes install ca-certificates git
 
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         submodules: 'recursive'
 
@@ -113,7 +113,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        freebsd-version: ['12', '13']
+        freebsd-version: ['12.4', '13.2']
     env:
       FREEBSD_VERSION: ${{ matrix.freebsd-version }}
 
@@ -123,28 +123,30 @@ jobs:
       uses: ammaraskar/gcc-problem-matcher@master
 
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         submodules: 'recursive'
 
     - name: Start FreeBSD VM
+      id: start-vm
+      continue-on-error: true
       run: |
         echo '::group::Starting VM'
-        VAGRANT_CWD="$GITHUB_WORKSPACE/src/libtremotesf/.github/workflows" vagrant up --provider=virtualbox
+        VAGRANT_CWD="$GITHUB_WORKSPACE/.github/workflows" vagrant up --provider=virtualbox
         echo '::endgroup'
         echo '::group::Adding vagrant shell to PATH'
-        echo "$GITHUB_WORKSPACE/src/libtremotesf/.github/workflows" >> "$GITHUB_PATH"
+        echo "$GITHUB_WORKSPACE/.github/workflows" >> "$GITHUB_PATH"
         echo '::endgroup'
 
     - name: Install dependencies
+      if: steps.start-vm.outcome == 'success'
       shell: vagrant-freebsd-shell.sh {0}
       run: |
-        # Switch from latest to quarterly repo
-        sudo rm /usr/local/etc/pkg/repos/FreeBSD.conf
         sudo pkg update -f
         sudo pkg install -y cmake ninja pkgconf libpsl libfmt cpp-httplib qt5-buildtools qt5-qmake qt5-core qt5-network qt5-concurrent qt5-testlib qt5-widgets qt5-dbus kf5-kwidgetsaddons kf5-kwindowsystem gettext-tools cxxopts
 
     - name: Build for FreeBSD
+      if: steps.start-vm.outcome == 'success'
       shell: vagrant-freebsd-shell.sh {0}
       run: |
         set -e -o pipefail
@@ -178,7 +180,7 @@ jobs:
         flatpak remote-add --user --if-not-exists flathub 'https://flathub.org/repo/flathub.flatpakrepo'
 
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         submodules: 'recursive'
 
@@ -187,19 +189,29 @@ jobs:
         flatpak-builder --user --install-deps-from=flathub build-dir org.equeim.Tremotesf.json
 
   build-windows-msvc:
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain: ['msvc', 'msvc-clang']
+
     uses: ./.github/workflows/build-windows-msvc.yml
+    with:
+      build-with-msvc-clang-toolchain: ${{ matrix.toolchain == 'msvc-clang' && 'true' || 'false' }}
 
   build-windows-mingw:
     runs-on: windows-latest
 
     steps:
-    - name: Add GCC problem matcher
-      uses: ammaraskar/gcc-problem-matcher@master
-
-    - name: Checkout
-      uses: actions/checkout@v3
+    - name: Checkout Tremotesf
+      uses: actions/checkout@v4
       with:
         submodules: 'recursive'
+
+    - name: Checkout msys2-packages
+      uses: actions/checkout@v4
+      with:
+        repository: equeim/msys2-packages
+        path: msys2-packages
 
     - name: Set up MSYS2
       uses: msys2/setup-msys2@v2
@@ -213,24 +225,34 @@ jobs:
           mingw-w64-clang-x86_64-fmt
           mingw-w64-clang-x86_64-openssl
           mingw-w64-clang-x86_64-pkgconf
-          mingw-w64-clang-x86_64-qt5-base
-          mingw-w64-clang-x86_64-qt5-svg
-          mingw-w64-clang-x86_64-qt5-tools
-          mingw-w64-clang-x86_64-qt5-translations
-          mingw-w64-clang-x86_64-kwidgetsaddons-qt5
+          mingw-w64-clang-x86_64-qt6-base
+          mingw-w64-clang-x86_64-qt6-svg
+          mingw-w64-clang-x86_64-qt6-tools
+          mingw-w64-clang-x86_64-qt6-translations
           mingw-w64-clang-x86_64-cxxopts
+
+    - name: Build KF6 dependencies
+      shell: msys2 {0}
+      run: |
+        cd "$GITHUB_WORKSPACE/msys2-packages/mingw-w64-extra-cmake-modules-qt6"
+        makepkg-mingw --cleanbuild --syncdeps --force --noconfirm --install
+        cd "$GITHUB_WORKSPACE/msys2-packages/mingw-w64-kwidgetsaddons-qt6"
+        makepkg-mingw --cleanbuild --syncdeps --force --noconfirm --install
 
     - name: Generate C++/WinRT headers
       shell: msys2 {0}
       run: |
           cppwinrt -input sdk -output /clang64/include
 
+    - name: Add GCC problem matcher
+      uses: ammaraskar/gcc-problem-matcher@master
+
     - name: Build with LLVM MinGW toolchain
       shell: msys2 {0}
       run: |
           set -e -o pipefail
           echo '::group::Configuring CMake'
-          cmake -S . --preset base
+          cmake -S . --preset base -D TREMOTESF_QT6=ON
           echo '::endgroup'
           echo '::group::Building Debug'
           cmake --build --preset base-debug
@@ -249,7 +271,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Check out
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Check REUSE compliance
       run: |
