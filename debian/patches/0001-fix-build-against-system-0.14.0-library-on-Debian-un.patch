@@ -1,0 +1,37 @@
+From ec4b4d8dbf26d408e34d3b3a4397dcb50c74f351 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Antoine=20Beaupr=C3=A9?= <anarcat@debian.org>
+Date: Mon, 13 Nov 2023 10:39:59 -0500
+Subject: [PATCH] fix build against system 0.14.0 library on Debian unstable
+
+In the Debian package, we build without the httplib submodule. This
+somehow triggers this code path which fails with:
+
+    --   Package dependency requirement 'cpp-httplib <= 0.14' could not be satisfied.
+    Package 'cpp-httplib' has version '0.14.0', required version is '<= 0.14'
+
+This rather counter-intuitive message actually says that 0.14.0, the
+version found in pkgconfig is *higher* than 0.14. That seems bizarre,
+but it's the way this works.
+
+Since what we're trying to do here is specify a minimum version, just
+do that and skip the upper bound altogether.
+---
+ src/CMakeLists.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 447ab49..bc2131d 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -346,7 +346,7 @@ if (BUILD_TESTING)
+     if (NOT httplib_FOUND)
+         message(STATUS "Did not found cpp-httplib as a CMake package, trying pkg-config")
+         find_package(PkgConfig REQUIRED)
+-        pkg_check_modules(httplib IMPORTED_TARGET cpp-httplib>=0.11 cpp-httplib<=0.14)
++        pkg_check_modules(httplib IMPORTED_TARGET cpp-httplib>=0.11)
+     endif()
+     if (NOT httplib_FOUND)
+         message(STATUS "Using bundled cpp-httplib")
+-- 
+2.39.2
+
