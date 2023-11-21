@@ -2,3 +2,6 @@
 
 %:
 	dh $@ --buildsystem=cmake+ninja
+
+override_dh_ctest_configure:
+	dh_ctest_configure -- -D TREMOTESF_WITH_HTTPLIB=none
