@@ -1,3 +1,10 @@
+tremotesf (2.6.0-1) unstable; urgency=medium
+
+  * New upstream release
+  * Remove patch merged upstream
+
+ -- Antoine Beaupré <anarcat@debian.org>  Thu, 11 Jan 2024 22:35:18 -0500
+
 tremotesf (2.5.0-1) unstable; urgency=medium
 
   * New upstream release: upstream started work on Qt6 but not enabled by
