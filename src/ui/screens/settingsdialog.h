@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -10,11 +10,13 @@
 class QCheckBox;
 
 namespace tremotesf {
+    class Rpc;
+
     class SettingsDialog final : public QDialog {
         Q_OBJECT
 
     public:
-        explicit SettingsDialog(QWidget* parent = nullptr);
+        explicit SettingsDialog(Rpc* rpc, QWidget* parent = nullptr);
     };
 }
 

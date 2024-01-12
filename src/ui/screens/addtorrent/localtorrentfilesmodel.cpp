@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -61,7 +61,7 @@ namespace tremotesf {
             std::vector<TorrentFilesModelFile*> files;
         };
 
-        CreateTreeResult createTree(bencode::Value&& bencodeParseResult) {
+        CreateTreeResult createTree(bencode::Value bencodeParseResult) {
             auto rootMap = bencodeParseResult.maybeTakeDictionary();
             if (!rootMap) {
                 throw bencode::Error(bencode::Error::Type::Parsing, "Root element is not a dictionary");

@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+# SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 #
 # SPDX-License-Identifier: CC0-1.0
 
@@ -30,15 +30,29 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout
+    - name: Check out sources
       uses: actions/checkout@v4
       with:
         submodules: 'recursive'
 
-    - name: Make source package
-      id: make-source-package
+    - name: Make source archive
       run: |
         .github/workflows/make-source-archive.py --output-directory .. --debian gzip
+
+    - name: Check out Debian sources
+      uses: actions/checkout@v4
+      with:
+        repository: equeim/tremotesf-debian
+        ref: ${{ github.event.release.tag_name }}
+        path: tremotesf-debian
+
+    - name: Remove everything except debian/ directory
+      run: |
+        mv tremotesf-debian/debian debian
+        rm -rf tremotesf-debian
+
+    - name: Make source package
+      run: |
         dpkg-buildpackage --build=source --no-pre-clean
 
     - name: Upload source package to release
@@ -58,4 +72,9 @@ jobs:
     uses: ./.github/workflows/build-windows-msvc.yml
     with:
       build-with-msvc-clang-toolchain: 'false'
+      release-tag: ${{ github.event.release.tag_name }}
+
+  build-macos:
+    uses: ./.github/workflows/build-macos.yml
+    with:
       release-tag: ${{ github.event.release.tag_name }}

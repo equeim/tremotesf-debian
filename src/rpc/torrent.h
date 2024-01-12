@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -53,8 +53,9 @@ namespace tremotesf {
         [[nodiscard]] bool update(const QJsonObject& object, bool firstTime, const Rpc* rpc);
 
         enum class UpdateKey;
-        [[nodiscard]] bool
-        update(std::span<const std::optional<UpdateKey>> keys, const QJsonArray& values, bool firstTime, const Rpc* rpc);
+        [[nodiscard]] bool update(
+            std::span<const std::optional<UpdateKey>> keys, const QJsonArray& values, bool firstTime, const Rpc* rpc
+        );
 
         int id{};
         QString hashString{};

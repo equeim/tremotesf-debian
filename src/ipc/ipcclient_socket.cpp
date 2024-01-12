@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -14,7 +14,6 @@
 
 namespace tremotesf {
     class IpcClientSocket final : public IpcClient {
-
     public:
         IpcClientSocket() {
             mSocket.connectToServer(IpcServerSocket::socketName());

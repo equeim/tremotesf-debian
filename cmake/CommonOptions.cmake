@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+# SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 #
 # SPDX-License-Identifier: CC0-1.0
 
@@ -8,7 +8,7 @@ endif()
 
 if (TREMOTESF_QT6)
     set(TREMOTESF_QT_VERSION_MAJOR 6)
-    set(TREMOTESF_MINIMUM_QT_VERSION 6.0)
+    set(TREMOTESF_MINIMUM_QT_VERSION 6.6)
 else()
     set(TREMOTESF_QT_VERSION_MAJOR 5)
     set(TREMOTESF_MINIMUM_QT_VERSION 5.15)
@@ -38,7 +38,6 @@ function(set_common_options_on_targets)
         -Wall
         -Wextra
         -Wpedantic
-        -Werror=non-virtual-dtor
         -Wcast-align
         -Woverloaded-virtual
         -Wconversion
@@ -46,6 +45,8 @@ function(set_common_options_on_targets)
         -Wdouble-promotion
         -Wformat=2
         -Werror=format
+        -Werror=non-virtual-dtor
+        -Werror=return-type
     )
     if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         list(APPEND gcc_style_warnings -Wlogical-op-parentheses -Wno-gnu-zero-variadic-macro-arguments)

@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.6.0] - 2024-01-08
+### Added
+- macOS support
+- Option to open torrent's file or download directory on double click
+- Option to not activate main window when adding torrents (except on macOS where application is always activated)
+- Option to not show "Add Torrent" dialog when adding torrents
+- Right click on status bar opens menu to quickly connect to different server
+- Support of xdg-activation protocol on Wayland
+
+### Changed
+- "Open" and "Show in file manager" actions now show error dialog if file/directory does not exist,
+  instead if being inaccessible
+- "Show in file manager" actions has been renamed to "Open download directory"
+- Progress bar's text is now drawn according to Qt style (though Breeze style still draws text next to the progress bar, not inside of it)
+
+### Fixed
+- Initial state of "Lock toolbar" menu action
+- Progress bar being drawn in incorrect column in torrent's files list
+
 ## [2.5.0] - 2023-10-15
 ### Added
 - Qt 6 support (with unreleased KF6 libraries)

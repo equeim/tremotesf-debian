@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 // SPDX-FileCopyrightText: 2021 LuK1337
 // SPDX-FileCopyrightText: 2022 Alex <tabell@users.noreply.github.com>
 //
@@ -51,6 +51,9 @@ namespace tremotesf {
 
         SETTINGS_PROPERTY_TRIVIAL(bool, fillTorrentLinkFromClipboard, setFillTorrentLinkFromClipboard)
 
+        SETTINGS_PROPERTY_TRIVIAL(bool, showMainWindowWhenAddingTorrent, setShowMainWindowWhenAddingTorrent)
+        SETTINGS_PROPERTY_TRIVIAL(bool, showAddTorrentDialog, setShowAddTorrentDialog)
+
         SETTINGS_PROPERTY_TRIVIAL(bool, isTorrentsStatusFilterEnabled, setTorrentsStatusFilterEnabled)
         SETTINGS_PROPERTY_TRIVIAL(TorrentsProxyModel::StatusFilter, torrentsStatusFilter, setTorrentsStatusFilter)
 
@@ -83,8 +86,14 @@ namespace tremotesf {
         enum class DarkThemeMode { FollowSystem, On, Off };
         Q_ENUM(DarkThemeMode)
 
+        enum class TorrentDoubleClickAction { OpenPropertiesDialog, OpenTorrentFile, OpenDownloadDirectory };
+        Q_ENUM(TorrentDoubleClickAction)
+
         SETTINGS_PROPERTY_TRIVIAL(Settings::DarkThemeMode, darkThemeMode, setDarkThemeMode)
         SETTINGS_PROPERTY_TRIVIAL(bool, useSystemAccentColor, setUseSystemAccentColor)
+        SETTINGS_PROPERTY_TRIVIAL(
+            Settings::TorrentDoubleClickAction, torrentDoubleClickAction, setTorrentDoubleClickAction
+        )
 
     public:
         static Settings* instance();

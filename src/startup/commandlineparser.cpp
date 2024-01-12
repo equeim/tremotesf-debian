@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -29,7 +29,7 @@ namespace tremotesf {
         }
 
         std::string_view executableFileName(std::string_view arg0) {
-            if constexpr (isTargetOsWindows) {
+            if constexpr (targetOs == TargetOs::Windows) {
                 if (const auto name = substrAfterChar(arg0, '\\'); name) {
                     return *name;
                 }

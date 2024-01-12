@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -8,7 +8,7 @@
 #include <QStyle>
 
 #include "itemlistupdater.h"
-#include "utils.h"
+#include "formatutils.h"
 
 namespace tremotesf {
     BaseTorrentFilesModel::BaseTorrentFilesModel(std::vector<Column>&& columns, QObject* parent)
@@ -48,10 +48,10 @@ namespace tremotesf {
             case Column::Name:
                 return entry->name();
             case Column::Size:
-                return Utils::formatByteSize(entry->size());
+                return formatutils::formatByteSize(entry->size());
             case Column::ProgressBar:
             case Column::Progress:
-                return Utils::formatProgress(entry->progress());
+                return formatutils::formatProgress(entry->progress());
             case Column::Priority:
                 return entry->priorityString();
             default:

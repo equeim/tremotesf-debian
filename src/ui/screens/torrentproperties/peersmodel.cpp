@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -9,7 +9,7 @@
 
 #include "log/log.h"
 #include "rpc/torrent.h"
-#include "utils.h"
+#include "formatutils.h"
 
 namespace tremotesf {
     PeersModel::PeersModel(Torrent* torrent, QObject* parent) : QAbstractTableModel(parent) { setTorrent(torrent); }
@@ -33,12 +33,12 @@ namespace tremotesf {
             case Column::Address:
                 return peer.address;
             case Column::DownloadSpeed:
-                return Utils::formatByteSpeed(peer.downloadSpeed);
+                return formatutils::formatByteSpeed(peer.downloadSpeed);
             case Column::UploadSpeed:
-                return Utils::formatByteSpeed(peer.uploadSpeed);
+                return formatutils::formatByteSpeed(peer.uploadSpeed);
             case Column::ProgressBar:
             case Column::Progress:
-                return Utils::formatProgress(peer.progress);
+                return formatutils::formatProgress(peer.progress);
             case Column::Flags:
                 return peer.flags;
             case Column::Client:
@@ -68,6 +68,8 @@ namespace tremotesf {
             default:
                 return data(index, Qt::DisplayRole);
             }
+        default:
+            break;
         }
         return {};
     }

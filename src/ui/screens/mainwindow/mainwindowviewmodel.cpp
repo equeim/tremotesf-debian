@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -19,6 +19,7 @@
 #include "log/log.h"
 #include "ipc/ipcserver.h"
 #include "rpc/servers.h"
+#include "ui/screens/addtorrent/addtorrenthelpers.h"
 #include "ui/screens/addtorrent/droppedtorrents.h"
 #include "ui/notificationscontroller.h"
 #include "settings.h"
@@ -58,29 +59,34 @@ namespace tremotesf {
         if (!commandLineFiles.isEmpty() || !commandLineUrls.isEmpty()) {
             QMetaObject::invokeMethod(
                 this,
-                [=, this] { addTorrents(commandLineFiles, commandLineUrls, true); },
+                [commandLineFiles = std::move(commandLineFiles), commandLineUrls = std::move(commandLineUrls), this] {
+                    addTorrents(commandLineFiles, commandLineUrls, {});
+                },
                 Qt::QueuedConnection
             );
         }
 
-        auto ipcServer = IpcServer::createInstance(this);
+        const auto* const ipcServer = IpcServer::createInstance(this);
         QObject::connect(
             ipcServer,
             &IpcServer::windowActivationRequested,
             this,
-            [=, this](const auto&, const auto& startupNoficationId) { emit showWindow(startupNoficationId); }
+            [=, this](const auto&, const auto& activationToken) { emit showWindow(activationToken); }
         );
 
         QObject::connect(
             ipcServer,
             &IpcServer::torrentsAddingRequested,
             this,
-            [=, this](const auto& files, const auto& urls) { addTorrents(files, urls); }
+            [=, this](const auto& files, const auto& urls, const auto& activationToken) {
+                addTorrents(files, urls, activationToken);
+            }
         );
 
         QObject::connect(&mRpc, &Rpc::connectedChanged, this, [this] {
             if (mRpc.isConnected()) {
                 if (delayedTorrentAddMessageTimer) {
+                    logInfo("Cancelling showing delayed torrent adding message");
                     delayedTorrentAddMessageTimer->stop();
                     delayedTorrentAddMessageTimer->deleteLater();
                     delayedTorrentAddMessageTimer = nullptr;
@@ -88,7 +94,7 @@ namespace tremotesf {
                 if ((!mPendingFilesToOpen.empty() || !mPendingUrlsToOpen.empty())) {
                     const QStringList files = std::move(mPendingFilesToOpen);
                     const QStringList urls = std::move(mPendingUrlsToOpen);
-                    emit showAddTorrentDialogs(files, urls);
+                    emit showAddTorrentDialogs(files, urls, {});
                 }
             }
         });
@@ -166,19 +172,49 @@ namespace tremotesf {
         return StartupActionResult::DoNothing;
     }
 
+    void MainWindowViewModel::addTorrentFilesWithoutDialog(const QStringList& files) {
+        const auto parameters = getAddTorrentParameters(&mRpc);
+        for (const auto& filePath : files) {
+            mRpc.addTorrentFile(
+                filePath,
+                parameters.downloadDirectory,
+                {},
+                {},
+                {},
+                {},
+                parameters.priority,
+                parameters.startAfterAdding
+            );
+            if (parameters.deleteTorrentFile) {
+                deleteTorrentFile(filePath, parameters.moveTorrentFileToTrash);
+            }
+        }
+    }
+
+    void MainWindowViewModel::addTorrentLinksWithoutDialog(const QStringList& urls) {
+        const auto parameters = getAddTorrentParameters(&mRpc);
+        for (const auto& url : urls) {
+            mRpc.addTorrentLink(url, parameters.downloadDirectory, parameters.priority, parameters.startAfterAdding);
+        }
+    }
+
     void MainWindowViewModel::addTorrents(
-        const QStringList& files, const QStringList& urls, bool showDelayedMessageWithDelay
+        const QStringList& files, const QStringList& urls, const std::optional<QByteArray>& windowActivationToken
     ) {
         logInfo("MainWindowViewModel: addTorrents() called");
         logInfo("MainWindowViewModel: files = {}", files);
         logInfo("MainWindowViewModel: urls = {}", urls);
-        if (mRpc.isConnected()) {
-            emit showAddTorrentDialogs(files, urls);
+        const auto connectionState = mRpc.connectionState();
+        if (connectionState == RpcConnectionState::Connected) {
+            emit showAddTorrentDialogs(files, urls, windowActivationToken);
         } else {
             mPendingFilesToOpen.append(files);
             mPendingUrlsToOpen.append(urls);
-            logInfo("Delaying opening torrents until connected to server");
-            if (showDelayedMessageWithDelay) {
+            logInfo("Postponing opening torrents until connected to server");
+            emit showWindow(windowActivationToken);
+            // If we are connecting then wait a bit before showing message
+            if (connectionState == RpcConnectionState::Connecting) {
+                logInfo("We are already connecting, wait a bit before showing message");
                 if (delayedTorrentAddMessageTimer) {
                     delayedTorrentAddMessageTimer->stop();
                     delayedTorrentAddMessageTimer->deleteLater();
@@ -187,6 +223,7 @@ namespace tremotesf {
                 delayedTorrentAddMessageTimer->setInterval(initialDelayedTorrentAddMessageDelay);
                 delayedTorrentAddMessageTimer->setSingleShot(true);
                 QObject::connect(delayedTorrentAddMessageTimer, &QTimer::timeout, this, [=, this] {
+                    logInfo("Showing delayed torrent adding message");
                     delayedTorrentAddMessageTimer = nullptr;
                     emit showDelayedTorrentAddMessage(files + urls);
                 });
@@ -198,6 +235,7 @@ namespace tremotesf {
                 );
                 delayedTorrentAddMessageTimer->start();
             } else {
+                logInfo("Showing delayed torrent adding message");
                 emit showDelayedTorrentAddMessage(files + urls);
             }
         }

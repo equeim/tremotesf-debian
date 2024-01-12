@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -8,6 +8,20 @@
 #    include <guiddef.h>
 #    include <winrt/base.h>
 #endif
+
+namespace tremotesf {
+    Q_LOGGING_CATEGORY(tremotesfLoggingCategory, tremotesfLoggingCategoryName, QtInfoMsg)
+
+    void overrideDebugLogs(bool enable) {
+        constexpr auto loggingRulesEnvVariable = "QT_LOGGING_RULES";
+        QByteArray rules = qgetenv(loggingRulesEnvVariable);
+        if (!rules.isEmpty()) {
+            rules += ";";
+        }
+        rules += fmt::format("{}.debug={}", tremotesfLoggingCategoryName, enable).c_str();
+        qputenv(loggingRulesEnvVariable, rules);
+    }
+}
 
 namespace tremotesf::impl {
     void QMessageLoggerDelegate::log(const QString& string) const {

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -43,6 +43,8 @@ namespace tremotesf {
                 case Qt::Key_Enter:
                 case Qt::Key_Return:
                     event->accept();
+                default:
+                    break;
                 }
             }
         };

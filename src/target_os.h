@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -8,28 +8,19 @@
 #include <QtGlobal>
 
 namespace tremotesf {
-    enum class TargetOs { UnixFreedesktop, UnixAndroid, UnixOther, Windows, Other };
+    enum class TargetOs { UnixFreedesktop, UnixMacOS, Windows };
 
     inline constexpr TargetOs targetOs =
-#ifdef Q_OS_UNIX
-#    ifdef TREMOTESF_UNIX_FREEDESKTOP
+#if defined(TREMOTESF_UNIX_FREEDESKTOP)
         TargetOs::UnixFreedesktop;
-#    else
-#        ifdef Q_OS_ANDROID
-        TargetOs::UnixAndroid;
-#        else
-        TargetOs::UnixOther;
-#        endif
-#    endif
-#else
-#    ifdef Q_OS_WIN
+#elif defined(Q_OS_MACOS)
+        TargetOs::UnixMacOS;
+#elif defined(Q_OS_WIN)
         TargetOs::Windows;
-#    else
-        TargetOs::Other;
-#    endif
+#else
+    // We shouldn't even get here since we will fail at CMake configuration step
+#    error "Unsupported target platform"
 #endif
-
-    inline constexpr bool isTargetOsWindows{targetOs == TargetOs::Windows};
 }
 
 #endif // TREMOTESF_TARGET_OS_H

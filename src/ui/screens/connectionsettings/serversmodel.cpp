@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -176,11 +176,13 @@ namespace tremotesf {
                         timeout,
 
                         autoReconnectEnabled,
-                        autoReconnectInterval},
+                        autoReconnectInterval
+                    },
                 .mountedDirectories = mountedDirectories,
                 .lastTorrents = {},
                 .lastDownloadDirectories = {},
-                .lastDownloadDirectory = {}});
+                .lastDownloadDirectory = {}
+            });
             endInsertRows();
             if (row == 0) {
                 mCurrentServer = name;

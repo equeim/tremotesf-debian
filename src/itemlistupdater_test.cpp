@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -13,6 +13,8 @@
 
 #include "log/log.h"
 #include "itemlistupdater.h"
+
+// NOLINTBEGIN(cppcoreguidelines-avoid-do-while)
 
 struct Item {
     int id;
@@ -64,6 +66,7 @@ protected:
 
     void onRemovedItems(size_t first, size_t last) override { removedIndexRanges.emplace_back(first, last); }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
     bool updateItem(Item& item, Item&& newItem) override {
         if (item != newItem) {
             item = newItem;

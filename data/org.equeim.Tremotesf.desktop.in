@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+# SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 #
 # SPDX-License-Identifier: CC0-1.0
 
@@ -12,4 +12,5 @@ Exec=tremotesf %U
 StartupNotify=true
 StartupWMClass=tremotesf
 X-GNOME-SingleWindow=true
+SingleMainWindow=true
 MimeType=application/x-bittorrent;x-scheme-handler/magnet;

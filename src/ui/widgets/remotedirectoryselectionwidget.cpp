@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -12,10 +12,12 @@
 #include <QPushButton>
 #include <QMessageBox>
 
+#include "desktoputils.h"
 #include "literals.h"
 #include "target_os.h"
 #include "rpc/rpc.h"
 #include "rpc/servers.h"
+#include "ui/stylehelpers.h"
 
 namespace tremotesf {
     RemoteDirectorySelectionWidgetViewModel::RemoteDirectorySelectionWidgetViewModel(
@@ -89,6 +91,13 @@ namespace tremotesf {
         mSelectDirectoryButton = new QPushButton(QIcon::fromTheme("document-open"_l1), QString(), this);
         layout->addWidget(mSelectDirectoryButton);
         mSelectDirectoryButton->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+        if constexpr (targetOs == TargetOs::UnixMacOS) {
+            if (determineStyle() == KnownStyle::macOS) {
+                // Button becomes ugly if we don't set these specific values
+                mSelectDirectoryButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+                mSelectDirectoryButton->setMaximumSize(32, 32);
+            }
+        }
 
         mViewModel = createViewModel(std::move(path), rpc);
 
@@ -156,7 +165,7 @@ namespace tremotesf {
             mViewModel->onFileDialogAccepted(dialog->selectedFiles().constFirst());
         });
 
-        if constexpr (isTargetOsWindows) {
+        if constexpr (targetOs == TargetOs::Windows) {
             dialog->open();
         } else {
             dialog->show();

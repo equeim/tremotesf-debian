@@ -1,11 +1,11 @@
 {
     "app-id": "org.equeim.Tremotesf",
     "runtime": "org.kde.Platform",
-    "runtime-version": "5.15-22.08",
+    "runtime-version": "5.15-23.08",
     "sdk": "org.kde.Sdk",
     "command": "tremotesf",
     "finish-args": [
-        "--socket=x11",
+        "--socket=fallback-x11",
         "--socket=wayland",
         "--share=ipc",
         "--share=network",
@@ -35,8 +35,8 @@
             "sources" : [
                 {
                     "type" : "archive",
-                    "url" : "https://github.com/fmtlib/fmt/releases/download/10.1.1/fmt-10.1.1.zip",
-                    "sha256" : "b84e58a310c9b50196cda48d5678d5fa0849bca19e5fdba6b684f0ee93ed9d1b"
+                    "url" : "https://github.com/fmtlib/fmt/releases/download/10.2.1/fmt-10.2.1.zip",
+                    "sha256" : "312151a2d13c8327f5c9c586ac6cf7cddc1658e8f53edae0ec56509c8fa516c9"
                 }
             ]
         },
@@ -70,8 +70,8 @@
             "sources" : [
                 {
                     "type" : "archive",
-                    "url" : "https://github.com/yhirose/cpp-httplib/archive/refs/tags/v0.14.0.tar.gz",
-                    "sha256" : "3a92248ef8cf2c32ad07f910b8e3052ff2427022b2adb871cf326fb620d2438e"
+                    "url" : "https://github.com/yhirose/cpp-httplib/archive/refs/tags/v0.14.3.tar.gz",
+                    "sha256" : "dcf6486d9030937636d8a4f820ca9531808fd7edb283893dddbaa05f99357e63"
                 }
             ]
         },

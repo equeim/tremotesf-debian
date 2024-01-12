@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -8,6 +8,7 @@
 #include <QObject>
 #include <QStringList>
 
+#include "ipc/ipcserver.h"
 #include "rpc/rpc.h"
 
 class QByteArray;
@@ -36,17 +37,26 @@ namespace tremotesf {
         enum class StartupActionResult { ShowAddServerDialog, DoNothing };
         StartupActionResult performStartupAction();
 
+        void addTorrentFilesWithoutDialog(const QStringList& files);
+        void addTorrentLinksWithoutDialog(const QStringList& urls);
+
     private:
         Rpc mRpc{};
         QStringList mPendingFilesToOpen{};
         QStringList mPendingUrlsToOpen{};
         QTimer* delayedTorrentAddMessageTimer{};
 
-        void addTorrents(const QStringList& files, const QStringList& urls, bool showDelayedMessageWithDelay = false);
+        void addTorrents(
+            const QStringList& files,
+            const QStringList& urls,
+            const std::optional<QByteArray>& windowActivationToken = {}
+        );
 
     signals:
-        void showWindow(const QByteArray& newStartupNotificationId);
-        void showAddTorrentDialogs(const QStringList& files, const QStringList& urls);
+        void showWindow(const std::optional<QByteArray>& windowActivationToken);
+        void showAddTorrentDialogs(
+            const QStringList& files, const QStringList& urls, const std::optional<QByteArray>& windowActivationToken
+        );
         void showDelayedTorrentAddMessage(const QStringList& torrents);
     };
 }

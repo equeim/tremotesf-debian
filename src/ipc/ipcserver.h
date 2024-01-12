@@ -1,10 +1,11 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #ifndef TREMOTESF_IPCSERVER_H
 #define TREMOTESF_IPCSERVER_H
 
+#include <optional>
 #include <QObject>
 
 namespace tremotesf {
@@ -18,9 +19,10 @@ namespace tremotesf {
         inline explicit IpcServer(QObject* parent = nullptr) : QObject(parent){};
 
     signals:
-        void windowActivationRequested(const QString& torrentHash, const QByteArray& startupNoficationId);
+        void
+        windowActivationRequested(const QString& torrentHash, const std::optional<QByteArray>& windowActivationToken);
         void torrentsAddingRequested(
-            const QStringList& files, const QStringList& urls, const QByteArray& startupNoficationId
+            const QStringList& files, const QStringList& urls, const std::optional<QByteArray>& windowActivationToken
         );
     };
 }

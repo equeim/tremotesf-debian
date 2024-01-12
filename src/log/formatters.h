@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -115,15 +115,15 @@ namespace fmt {
     };
 }
 
-#define SPECIALIZE_FORMATTER_FOR_QDEBUG(Class)                                   \
-    namespace fmt {                                                              \
-        template<>                                                               \
+#define SPECIALIZE_FORMATTER_FOR_QDEBUG(Class)                                \
+    namespace fmt {                                                           \
+        template<>                                                            \
         struct formatter<Class> : tremotesf::impl::QDebugFormatter<Class> {}; \
     }
 
-#define SPECIALIZE_FORMATTER_FOR_Q_ENUM(Enum)                                 \
-    namespace fmt {                                                           \
-        template<>                                                            \
+#define SPECIALIZE_FORMATTER_FOR_Q_ENUM(Enum)                              \
+    namespace fmt {                                                        \
+        template<>                                                         \
         struct formatter<Enum> : tremotesf::impl::QEnumFormatter<Enum> {}; \
     }
 

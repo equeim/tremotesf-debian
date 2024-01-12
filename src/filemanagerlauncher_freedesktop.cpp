@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -7,6 +7,7 @@
 #include <QDBusConnection>
 #include <QDBusPendingCallWatcher>
 #include <QUrl>
+#include <QWidget>
 
 #include "literals.h"
 #include "log/log.h"
@@ -22,6 +23,7 @@ namespace tremotesf {
 
         public:
             FreedesktopFileManagerLauncher() = default;
+
         protected:
             void launchFileManagerAndSelectFiles(
                 std::vector<FilesInDirectory> filesToSelect, QPointer<QWidget> parentWidget

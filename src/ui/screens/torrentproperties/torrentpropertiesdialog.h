@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -8,6 +8,8 @@
 #include <functional>
 #include <QDialog>
 #include <QPointer>
+
+#include "ui/savewindowstatedispatcher.h"
 
 class QTabWidget;
 class KMessageWidget;
@@ -61,6 +63,8 @@ namespace tremotesf {
 
         bool mUpdatingLimits{};
         std::function<void()> mUpdateLimitsTab;
+
+        SaveWindowStateHandler mSaveStateHandler{this, [this] { saveState(); }};
     };
 }
 

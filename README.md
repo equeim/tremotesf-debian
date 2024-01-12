@@ -10,7 +10,9 @@ Table of Contents
          * [Dependencies](#dependencies)
          * [Building](#building)
          * [GNU/Linux](#gnulinux)
+         * [FreeBSD](#freebsd)
          * [Windows](#windows)
+         * [macOS](#macos)
       * [Translations](#translations)
       * [Screenshots](#screenshots)
 
@@ -39,6 +41,10 @@ On Windows, also:
 - Windows 11 SDK is needed to build
 - Minimum supported OS version to run Tremotesf is Windows 10 1809 (October 2018 Update)
 
+On macOS, also:
+- Latest Xcode and macOS SDK versions supported by Qt (see [here](https://doc.qt.io/qt-6/macos.html))
+- Minimum supported OS version to run Tremotesf is macOS 12
+
 ### Building
 ```sh
 cmake -S /path/to/sources -B /path/to/build/directory --preset base-multi
@@ -53,11 +59,11 @@ You can invoke CMake in a different way if you want.
 
 - Arch Linux - [AUR](https://aur.archlinux.org/packages/tremotesf)
 
-- Debian - [OBS](https://build.opensuse.org/project/show/home:equeim:tremotesf)
+- Debian - [Official repository](https://packages.debian.org/sid/tremotesf), or [my own OBS repository](https://build.opensuse.org/package/show/home:equeim:tremotesf/Tremotesf)
 
 ```sh
-wget -qO - https://download.opensuse.org/repositories/home:/equeim:/tremotesf/Debian_11/Release.key | sudo tee /etc/apt/trusted.gpg.d/tremotesf.asc
-sudo add-apt-repository "deb http://download.opensuse.org/repositories/home:/equeim:/tremotesf/Debian_11/ /"
+wget -qO - https://download.opensuse.org/repositories/home:/equeim:/tremotesf/Debian_12/Release.key | sudo tee /etc/apt/trusted.gpg.d/tremotesf.asc
+sudo add-apt-repository "deb http://download.opensuse.org/repositories/home:/equeim:/tremotesf/Debian_12/ /"
 sudo apt update
 sudo apt install tremotesf
 ```
@@ -76,20 +82,23 @@ sudo dnf copr enable equeim/tremotesf
 sudo dnf install tremotesf
 ```
 
-- openSUSE Tumbleweed - [OBS](https://build.opensuse.org/project/show/home:equeim:tremotesf)
+- openSUSE Tumbleweed - [OBS](https://build.opensuse.org/package/show/home:equeim:tremotesf/Tremotesf)
 ```sh
 sudo zypper ar https://download.opensuse.org/repositories/home:/equeim:/tremotesf/openSUSE_Tumbleweed/home:equeim:tremotesf.repo
 sudo zypper in tremotesf
 ```
 
-- Ubuntu - [OBS](https://build.opensuse.org/project/show/home:equeim:tremotesf)
+- Ubuntu - [OBS](https://build.opensuse.org/package/show/home:equeim:tremotesf/Tremotesf)
 
 ```sh
-wget -qO - https://download.opensuse.org/repositories/home:/equeim:/tremotesf/xUbuntu_22.04/Release.key | sudo tee /etc/apt/trusted.gpg.d/tremotesf.asc
-sudo add-apt-repository "deb http://download.opensuse.org/repositories/home:/equeim:/tremotesf/xUbuntu_22.04/ /"
+wget -qO - https://download.opensuse.org/repositories/home:/equeim:/tremotesf/xUbuntu_23.10/Release.key | sudo tee /etc/apt/trusted.gpg.d/tremotesf.asc
+sudo add-apt-repository "deb http://download.opensuse.org/repositories/home:/equeim:/tremotesf/xUbuntu_23.10/ /"
 sudo apt update
 sudo apt install tremotesf
 ```
+
+### FreeBSD
+Tremotesf is [available in FreeBSD ports](https://www.freshports.org/net-p2p/tremotesf/).
 
 ### Windows
 Windows builds are available at [releases](https://github.com/equeim/tremotesf2/releases) page.
@@ -109,6 +118,27 @@ cmake -S path\to\sources -B path\to\build\directory --preset <windows-debug or w
 # Initial compilation of dependencies will take a while
 cmake --build path\to\build\directory
 cmake --install path\to\build\directory --prefix path\to\install\directory
+# Next command creates ZIP archive and MSI installer
+cmake --build path\to\build\directory --target package
+```
+
+### macOS
+macOS builds are available at [releases](https://github.com/equeim/tremotesf2/releases) page.
+Minimum supported OS version to run Tremotesf is macOS 12.
+
+Build instructions with vcpkg:
+1. Install Xcode
+2. Install CMake
+3. Install and setup [vcpkg](https://github.com/microsoft/vcpkg#quick-start-windows), and make sure that you have 15 GB of free space on disk where vcpkg is located
+4. Set VCPKG_ROOT environment variable to the location of vcpkg installation
+5. Launch terminal, execute:
+```sh
+cmake -S path/to/sources -B path/to/build/directory --preset <macos-arm64-vcpkg or macos-x86_64-vcpkg>
+# Initial compilation of dependencies will take a while
+cmake --build path/to/build/directory
+cmake --install path/to/build/directory --prefix path/to/install/directory
+# Next command creates DMG image
+cmake --build path/to/build/directory --target package
 ```
 
 ## Translations

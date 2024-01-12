@@ -1,11 +1,14 @@
-# SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+# SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 #
 # SPDX-License-Identifier: CC0-1.0
 
 %global app_id org.equeim.Tremotesf
 
+%bcond qt6 0
+%global qt_version %[%{with qt6} ? 6 : 5]
+
 Name:       tremotesf
-Version:    2.5.0
+Version:    2.6.0
 Release:    1%{!?suse_version:%{?dist}}
 Summary:    Remote GUI for transmission-daemon
 %if %{defined suse_version}
@@ -24,45 +27,41 @@ BuildRequires: desktop-file-utils
 BuildRequires: gettext
 BuildRequires: make
 BuildRequires: zstd
-BuildRequires: cmake(Qt5)
-BuildRequires: cmake(Qt5Concurrent)
-BuildRequires: cmake(Qt5Core)
-BuildRequires: cmake(Qt5DBus)
-BuildRequires: cmake(Qt5LinguistTools)
-BuildRequires: cmake(Qt5Network)
-BuildRequires: cmake(Qt5Test)
-BuildRequires: cmake(Qt5Widgets)
+BuildRequires: cmake(Qt%{qt_version})
+BuildRequires: cmake(Qt%{qt_version}Concurrent)
+BuildRequires: cmake(Qt%{qt_version}Core)
+BuildRequires: cmake(Qt%{qt_version}DBus)
+BuildRequires: cmake(Qt%{qt_version}LinguistTools)
+BuildRequires: cmake(Qt%{qt_version}Network)
+BuildRequires: cmake(Qt%{qt_version}Test)
+BuildRequires: cmake(Qt%{qt_version}Widgets)
 BuildRequires: cmake(fmt)
-BuildRequires: cmake(KF5WidgetsAddons)
-BuildRequires: cmake(KF5WindowSystem)
+BuildRequires: cmake(KF%{qt_version}WidgetsAddons)
+BuildRequires: cmake(KF%{qt_version}WindowSystem)
 BuildRequires: cmake(cxxopts)
 BuildRequires: pkgconfig(libpsl)
 BuildRequires: openssl-devel
 
 %if %{defined fedora}
 BuildRequires: cmake(httplib)
-%endif
-
-%if %{defined suse_version}
-BuildRequires: appstream-glib
-# OBS complains about not owned directories if hicolor-icon-theme isn't installed at build time
-BuildRequires: hicolor-icon-theme
-%else
-    %if %{defined mageia}
-BuildRequires: appstream-util
-    %else
 BuildRequires: libappstream-glib
-    %endif
-%endif
-
-%if %{defined fedora} && "%{toolchain}" == "clang"
+%if  "%{toolchain}" == "clang"
 BuildRequires: clang
 %else
 BuildRequires: gcc-c++
 %endif
+%endif
 
-%if %{undefined _metainfodir}
-    %global _metainfodir %{_datadir}/metainfo
+%if %{defined suse_version}
+BuildRequires: pkgconfig(cpp-httplib)
+BuildRequires: appstream-glib
+# OBS complains about not owned directories if hicolor-icon-theme isn't installed at build time
+BuildRequires: hicolor-icon-theme
+%global _metainfodir %{_datadir}/metainfo
+%endif
+
+%if %{defined mageia}
+BuildRequires: appstream-util
 %endif
 
 %description
@@ -74,7 +73,7 @@ Remote GUI for Transmission BitTorrent client.
 
 
 %build
-%cmake
+%cmake -D TREMOTESF_QT6=%[%{with qt6} ? "ON" : "OFF"]
 %cmake_build
 
 %check
@@ -92,6 +91,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{app_id}.desktop
 %{_metainfodir}/%{app_id}.appdata.xml
 
 %changelog
+* Mon Jan 08 2024 Alexey Rochev <equeim@gmail.com> - 2.6.0-1
+- tremotesf-2.6.0
+
 * Sun Oct 15 2023 Alexey Rochev <equeim@gmail.com> - 2.5.0-1
 - tremotesf-2.5.0
 

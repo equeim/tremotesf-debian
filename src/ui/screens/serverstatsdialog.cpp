@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -17,7 +17,7 @@
 
 #include "rpc/serverstats.h"
 #include "rpc/rpc.h"
-#include "utils.h"
+#include "formatutils.h"
 
 namespace tremotesf {
     ServerStatsDialog::ServerStatsDialog(Rpc* rpc, QWidget* parent) : QDialog(parent) {
@@ -36,6 +36,7 @@ namespace tremotesf {
         //: Server stats section for current Transmission launch
         auto currentSessionGroupBox = new QGroupBox(qApp->translate("tremotesf", "Current session"), this);
         auto currentSessionGroupBoxLayout = new QFormLayout(currentSessionGroupBox);
+        currentSessionGroupBoxLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
 
         auto sessionDownloadedLabel = new QLabel(this);
         //: Downloaded bytes
@@ -54,6 +55,7 @@ namespace tremotesf {
         //: Server stats section for all Transmission launches (accumulated)
         auto totalGroupBox = new QGroupBox(qApp->translate("tremotesf", "Total"), this);
         auto totalGroupBoxLayout = new QFormLayout(totalGroupBox);
+        totalGroupBoxLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
 
         auto totalDownloadedLabel = new QLabel(this);
         //: Downloaded bytes
@@ -103,18 +105,18 @@ namespace tremotesf {
 
         auto update = [=] {
             const SessionStats currentSessionStats(rpc->serverStats()->currentSession());
-            sessionDownloadedLabel->setText(Utils::formatByteSize(currentSessionStats.downloaded()));
-            sessionUploadedLabel->setText(Utils::formatByteSize(currentSessionStats.uploaded()));
+            sessionDownloadedLabel->setText(formatutils::formatByteSize(currentSessionStats.downloaded()));
+            sessionUploadedLabel->setText(formatutils::formatByteSize(currentSessionStats.uploaded()));
             sessionRatioLabel->setText(
-                Utils::formatRatio(currentSessionStats.downloaded(), currentSessionStats.uploaded())
+                formatutils::formatRatio(currentSessionStats.downloaded(), currentSessionStats.uploaded())
             );
-            sessionDurationLabel->setText(Utils::formatEta(currentSessionStats.duration()));
+            sessionDurationLabel->setText(formatutils::formatEta(currentSessionStats.duration()));
 
             const SessionStats totalStats(rpc->serverStats()->total());
-            totalDownloadedLabel->setText(Utils::formatByteSize(totalStats.downloaded()));
-            totalUploadedLabel->setText(Utils::formatByteSize(totalStats.uploaded()));
-            totalRatioLabel->setText(Utils::formatRatio(totalStats.downloaded(), totalStats.uploaded()));
-            totalDurationLabel->setText(Utils::formatEta(totalStats.duration()));
+            totalDownloadedLabel->setText(formatutils::formatByteSize(totalStats.downloaded()));
+            totalUploadedLabel->setText(formatutils::formatByteSize(totalStats.uploaded()));
+            totalRatioLabel->setText(formatutils::formatRatio(totalStats.downloaded(), totalStats.uploaded()));
+            totalDurationLabel->setText(formatutils::formatEta(totalStats.duration()));
 
             //: How many times Transmission was launched
             sessionCountLabel->setText(qApp->translate("tremotesf", "%Ln times", nullptr, totalStats.sessionCount()));
@@ -123,7 +125,7 @@ namespace tremotesf {
         };
         QObject::connect(rpc->serverStats(), &ServerStats::updated, this, update);
         QObject::connect(rpc, &Rpc::gotDownloadDirFreeSpace, this, [freeSpaceField](long long bytes) {
-            freeSpaceField->setText(Utils::formatByteSize(bytes));
+            freeSpaceField->setText(formatutils::formatByteSize(bytes));
         });
         update();
     }

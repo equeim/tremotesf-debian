@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -78,7 +78,6 @@ namespace tremotesf {
                                                       DownloadDirectoriesModel,
                                                       DownloadDirectoriesModel::DirectoryItem,
                                                       std::vector<DownloadDirectoriesModel::DirectoryItem>> {
-
     public:
         inline explicit DownloadDirectoriesModelUpdater(DownloadDirectoriesModel& model) : ModelListUpdater(model) {}
 
@@ -93,7 +92,9 @@ namespace tremotesf {
         }
 
         bool updateItem(
-            DownloadDirectoriesModel::DirectoryItem& item, DownloadDirectoriesModel::DirectoryItem&& newItem
+            DownloadDirectoriesModel::DirectoryItem& item,
+            // NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
+            DownloadDirectoriesModel::DirectoryItem&& newItem
         ) override {
             if (item.torrents != newItem.torrents) {
                 item.torrents = newItem.torrents;
