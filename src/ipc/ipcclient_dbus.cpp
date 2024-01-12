@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -13,10 +13,13 @@
 #include "tremotesf_dbus_generated/ipc/org.freedesktop.Application.h"
 #include "ipcserver_dbus.h"
 #include "ipcserver_dbus_service.h"
+#include "unixhelpers.h"
 
 namespace tremotesf {
     namespace {
-        inline bool waitForReply(QDBusPendingReply<>&& pending) {
+        constexpr auto desktopStartupIdEnvVariable = "DESKTOP_STARTUP_ID";
+
+        inline bool waitForReply(QDBusPendingReply<> pending) {
             pending.waitForFinished();
             const auto reply(pending.reply());
             if (reply.type() != QDBusMessage::ReplyMessage) {
@@ -28,7 +31,6 @@ namespace tremotesf {
     }
 
     class IpcClientDbus final : public IpcClient {
-
     public:
         IpcClientDbus() = default;
 
@@ -56,14 +58,27 @@ namespace tremotesf {
 
     private:
         static inline QVariantMap getPlatformData() {
-            if (qEnvironmentVariableIsSet("DESKTOP_STARTUP_ID")) {
-                return {{IpcDbusService::desktopStartupIdField, qgetenv("DESKTOP_STARTUP_ID")}};
+            QVariantMap data{};
+            if (qEnvironmentVariableIsSet(desktopStartupIdEnvVariable)) {
+                const auto startupId = qgetenv(desktopStartupIdEnvVariable);
+                logInfo("{} is '{}'", desktopStartupIdEnvVariable, startupId);
+                data.insert(IpcDbusService::desktopStartupIdField, startupId);
+            } else {
+                logInfo("{} is not set", desktopStartupIdEnvVariable);
             }
-            return {};
+            if (qEnvironmentVariableIsSet(xdgActivationTokenEnvVariable)) {
+                const auto activationToken = qgetenv(xdgActivationTokenEnvVariable);
+                logInfo("{} is '{}'", xdgActivationTokenEnvVariable, activationToken);
+                data.insert(IpcDbusService::xdgActivationTokenField, qgetenv(xdgActivationTokenEnvVariable));
+            } else {
+                logInfo("{} is not set", xdgActivationTokenEnvVariable);
+            }
+            return data;
         }
 
         OrgFreedesktopApplicationInterface mInterface{
-            IpcServerDbus::serviceName, IpcServerDbus::objectPath, QDBusConnection::sessionBus()};
+            IpcServerDbus::serviceName, IpcServerDbus::objectPath, QDBusConnection::sessionBus()
+        };
     };
 
     std::unique_ptr<IpcClient> IpcClient::createInstance() { return std::make_unique<IpcClientDbus>(); }

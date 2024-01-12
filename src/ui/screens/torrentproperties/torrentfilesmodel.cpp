@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -56,7 +56,7 @@ namespace tremotesf {
             QFutureWatcher<std::pair<std::shared_ptr<TorrentFilesModelDirectory>, std::vector<TorrentFilesModelFile*>>>;
 
         std::pair<std::shared_ptr<TorrentFilesModelDirectory>, std::vector<TorrentFilesModelFile*>>
-        doCreateTree(std::vector<TorrentFile>&& files) {
+        doCreateTree(const std::vector<TorrentFile>& files) {
             auto rootDirectory = std::make_shared<TorrentFilesModelDirectory>();
             std::vector<TorrentFilesModelFile*> treeFiles;
             treeFiles.reserve(files.size());
@@ -177,7 +177,7 @@ namespace tremotesf {
             return localTorrentDownloadDirectoryPath(mRpc, mTorrent);
         }
         if (mTorrent->data().singleFile) {
-            return localTorrentFilesPath(mRpc, mTorrent);
+            return localTorrentRootFilePath(mRpc, mTorrent);
         }
         const auto* entry = static_cast<const TorrentFilesModelEntry*>(index.internalPointer());
         QString path(entry->path());
@@ -211,9 +211,8 @@ namespace tremotesf {
         mCreatingTree = true;
         beginResetModel();
 
-        const auto future = QtConcurrent::run([files = std::vector(mTorrent->files())]() mutable {
-            return doCreateTree(std::move(files));
-        });
+        const auto future =
+            QtConcurrent::run([files = std::vector(mTorrent->files())]() { return doCreateTree(files); });
 
         auto watcher = new FutureWatcher(this);
         QObject::connect(watcher, &FutureWatcher::finished, this, [=, this] {

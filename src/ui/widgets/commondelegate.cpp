@@ -1,8 +1,11 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "commondelegate.h"
+
+#include <stdexcept>
+#include <utility>
 
 #include <QAbstractItemView>
 #include <QApplication>
@@ -10,11 +13,27 @@
 #include <QHelpEvent>
 #include <QPainter>
 #include <QStyle>
+#include <QStyleFactory>
 #include <QStyleOptionProgressBar>
 #include <QToolTip>
 
+#include "ui/stylehelpers.h"
+#include "target_os.h"
+
 namespace tremotesf {
     namespace {
+        [[maybe_unused]] QStyle* fusionStyle() {
+            static QStyle* const style = [] {
+                const auto s = QStyleFactory::create("fusion");
+                if (!s) {
+                    throw std::runtime_error("Failed to create Fusion style");
+                }
+                s->setParent(qApp);
+                return s;
+            }();
+            return style;
+        }
+
         bool isTextElided(const QString& text, const QStyleOptionViewItem& option) {
             const QFontMetrics metrics(option.font);
             const int textWidth = metrics.horizontalAdvance(text);
@@ -25,50 +44,71 @@ namespace tremotesf {
 
             return textWidth > textRect.width();
         }
-
-        constexpr int spaceBetweenProgressBarAndText = 6;
     }
 
     void CommonDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const {
         QStyleOptionViewItem opt = option;
         initStyleOption(&opt, index);
 
-        const auto style = opt.widget ? opt.widget->style() : qApp->style();
+        auto* style = opt.widget ? opt.widget->style() : QApplication::style();
 
-        if (mTextElideModeRole.has_value()) {
-            opt.textElideMode = index.data(*mTextElideModeRole).value<Qt::TextElideMode>();
-        }
-
-        if (mProgressBarColumn.has_value() && mProgressRole.has_value() && index.column() == mProgressBarColumn) {
-            opt.displayAlignment = Qt::AlignRight | Qt::AlignVCenter;
-            opt.textElideMode = Qt::ElideNone;
-            style->drawControl(QStyle::CE_ItemViewItem, &opt, painter, opt.widget);
-
-            const int horizontalMargin = style->pixelMetric(QStyle::PM_FocusFrameHMargin);
-            const int verticalMargin = style->pixelMetric(QStyle::PM_FocusFrameVMargin);
-            const int textWidth = opt.fontMetrics.horizontalAdvance(opt.text);
-
-            QStyleOptionProgressBar progressBar{};
-            progressBar.rect = opt.rect.marginsRemoved(
-                QMargins(horizontalMargin, verticalMargin, textWidth + spaceBetweenProgressBarAndText, verticalMargin)
-            );
-            if (progressBar.rect.width() > 0) {
-                progressBar.minimum = 0;
-                progressBar.maximum = 100;
-                const auto progress = index.data(*mProgressRole).toDouble();
-                progressBar.progress = static_cast<int>(progress * 100);
-                if (progressBar.progress <= 0) {
-                    progressBar.progress = 1;
-                } else if (progressBar.progress > 100) {
-                    progressBar.progress = 100;
-                }
-                progressBar.state = opt.state | QStyle::State_Horizontal;
-
-                style->drawControl(QStyle::CE_ProgressBar, &progressBar, painter, opt.widget);
+        if (!(mProgressBarColumn.has_value() && mProgressRole.has_value() && index.column() == mProgressBarColumn)) {
+            if (mTextElideModeRole.has_value()) {
+                opt.textElideMode = index.data(*mTextElideModeRole).value<Qt::TextElideMode>();
             }
-        } else {
+            // Not progress bar
             style->drawControl(QStyle::CE_ItemViewItem, &opt, painter, opt.widget);
+            return;
         }
+
+        // Progress bar
+
+        // Draw background
+        style->drawPrimitive(QStyle::PE_PanelItemViewItem, &opt, painter, opt.widget);
+
+        const int horizontalMargin = style->pixelMetric(QStyle::PM_FocusFrameHMargin);
+        const int verticalMargin = style->pixelMetric(QStyle::PM_FocusFrameVMargin);
+
+        QStyleOptionProgressBar progressBar{};
+        progressBar.rect =
+            opt.rect.marginsRemoved(QMargins(horizontalMargin, verticalMargin, horizontalMargin, verticalMargin));
+        progressBar.minimum = 0;
+        progressBar.maximum = 100;
+        const auto progress = index.data(*mProgressRole).toDouble();
+        progressBar.progress = static_cast<int>(progress * 100);
+        if (progressBar.progress < 0) {
+            progressBar.progress = 0;
+        } else if (progressBar.progress > 100) {
+            progressBar.progress = 100;
+        }
+        progressBar.state = opt.state | QStyle::State_Horizontal;
+        progressBar.text = opt.text;
+        progressBar.textVisible = true;
+        progressBar.palette = opt.palette;
+        // Sometimes this is out of sync
+        if (opt.widget && opt.widget->isActiveWindow()) {
+            progressBar.palette.setCurrentColorGroup(QPalette::Active);
+        }
+        const auto knownStyle = determineStyle(style);
+        if constexpr (targetOs == TargetOs::UnixMacOS) {
+            if (knownStyle == KnownStyle::macOS) {
+                style = fusionStyle();
+            }
+        }
+#if QT_VERSION_MAJOR == 5
+        if (knownStyle == KnownStyle::Breeze) {
+            // Breeze style incorrectly uses WindowText color for text
+            if (progressBar.state.testFlag(QStyle::State_Selected)) {
+                progressBar.palette.setColor(
+                    QPalette::WindowText,
+                    progressBar.palette.color(QPalette::HighlightedText)
+                );
+            } else {
+                progressBar.palette.setColor(QPalette::WindowText, progressBar.palette.color(QPalette::Text));
+            }
+        }
+#endif
+        style->drawControl(QStyle::CE_ProgressBar, &progressBar, painter, opt.widget);
     }
 
     bool CommonDelegate::helpEvent(

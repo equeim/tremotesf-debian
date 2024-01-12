@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -27,6 +27,10 @@ namespace tremotesf {
         }
         return result;
     }
+
+#ifdef TREMOTESF_UNIX_FREEDESKTOP
+    inline constexpr auto xdgActivationTokenEnvVariable = "XDG_ACTIVATION_TOKEN";
+#endif
 }
 
 #endif // TREMOTESF_UNIXHELPERS_H

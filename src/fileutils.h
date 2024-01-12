@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -38,6 +38,9 @@ namespace tremotesf {
 
     void deleteFile(const QString& path);
     void moveFileToTrash(const QString& path);
+
+    [[maybe_unused]]
+    QString resolveExternalBundledResourcesPath(QLatin1String path);
 
     namespace impl {
         [[nodiscard]] QString readFileAsBase64String(QFile& file);

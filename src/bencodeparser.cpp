@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -114,7 +114,7 @@ namespace tremotesf::bencode {
             }
 
             template<std::default_initializable Container, std::invocable<Container&> ParseNextElement>
-            Container parseContainer(ParseNextElement&& parseNextElement) {
+            Container parseContainer(ParseNextElement parseNextElement) {
                 const auto containerPos = mFile.pos();
                 try {
                     skipByte();

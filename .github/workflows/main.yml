@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+# SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 #
 # SPDX-License-Identifier: CC0-1.0
 
@@ -19,13 +19,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        container-image: ['fedora:37', 'fedora:38', 'opensuse/tumbleweed:latest']
+        container-image: ['fedora:38', 'fedora:39', 'opensuse/tumbleweed:latest']
         compiler: [gcc]
+        qt-version: [5]
         include:
-        - container-image: 'fedora:37'
-          compiler: clang
         - container-image: 'fedora:38'
           compiler: clang
+        - container-image: 'fedora:39'
+          compiler: clang
+        - container-image: 'opensuse/tumbleweed:latest'
+          qt-version: 6
 
     runs-on: ubuntu-latest
     container: ${{ matrix.container-image }}
@@ -40,7 +43,7 @@ jobs:
 
     - name: Set packages install command for zypper
       if: startsWith(matrix.container-image, 'opensuse')
-      run: echo 'INSTALL_PACKAGES=zypper --non-interactive in --no-recommends' >> "$GITHUB_ENV"
+      run: echo 'INSTALL_PACKAGES=zypper --non-interactive --gpg-auto-import-keys in --no-recommends' >> "$GITHUB_ENV"
 
     - name: Install Git and rpm-build
       run: ${{env.INSTALL_PACKAGES}} git rpm-build
@@ -53,11 +56,17 @@ jobs:
     - name: Set Fedora compiler RPM macro
       id: fedora-compiler
       if: startsWith(matrix.container-image, 'fedora')
-      run: echo "rpm-macro=--define 'toolchain ${{ matrix.compiler }}'" >> "$GITHUB_OUTPUT"
+      run: |
+        echo "rpm-macro=--define 'toolchain ${{ matrix.compiler }}'" >> "$GITHUB_OUTPUT"
+
+    - name: Add KF6 repository
+      if: startsWith(matrix.container-image, 'opensuse') && matrix.qt-version == 6
+      run: |
+        zypper ar https://download.opensuse.org/repositories/KDE:/Unstable:/Frameworks/openSUSE_Factory/KDE:Unstable:Frameworks.repo
 
     - name: Install build dependencies
       run: |
-        readarray -t dependencies < <(rpmspec ${{steps.fedora-compiler.outputs.rpm-macro}} -q --srpm --qf '[%{REQUIRES}\n]' rpm/tremotesf.spec)
+        readarray -t dependencies < <(rpmspec ${{steps.fedora-compiler.outputs.rpm-macro}} ${{ matrix.qt-version == 6 && '--define "with_qt6 1"' || '' }} -q --srpm --qf '[%{REQUIRES}\n]' packaging/rpm/tremotesf.spec)
         ${{env.INSTALL_PACKAGES}} "${dependencies[@]}"
 
     - name: Make source archive
@@ -70,13 +79,14 @@ jobs:
         .github/workflows/make-source-archive.py --output-directory "$sourcedir" zstd
 
     - name: Build RPM
-      run: rpmbuild ${{steps.fedora-compiler.outputs.rpm-macro}} -bb rpm/tremotesf.spec
+      run: |
+        rpmbuild ${{steps.fedora-compiler.outputs.rpm-macro}} --${{ matrix.qt-version == 6 && 'with' || 'without' }} qt6 -bb packaging/rpm/tremotesf.spec
 
   build-deb:
     strategy:
       fail-fast: false
       matrix:
-        container-image: ['debian:11', 'debian:12', 'ubuntu:22.04', 'ubuntu:23.04']
+        container-image: ['debian:11', 'debian:12', 'ubuntu:22.04', 'ubuntu:23.10']
 
     runs-on: ubuntu-latest
     container: ${{ matrix.container-image }}
@@ -85,86 +95,39 @@ jobs:
     - name: Add GCC problem matcher
       uses: ammaraskar/gcc-problem-matcher@master
 
-    - name: Install Git
+    - name: Install dependencies needed to make source archive
       run: |
-        apt-get update && DEBIAN_FRONTEND=noninteractive apt-get --no-install-recommends --assume-yes install ca-certificates git
+        apt-get update && DEBIAN_FRONTEND=noninteractive apt-get --no-install-recommends --assume-yes install ca-certificates git python3 cmake
 
-    - name: Checkout
+    - name: Check out sources
       uses: actions/checkout@v4
       with:
         submodules: 'recursive'
-
-    - name: Install build dependencies
-      run: |
-        apt-get update && DEBIAN_FRONTEND=noninteractive apt-get --no-install-recommends --assume-yes build-dep .
 
     - name: Make source archive
       run: |
         # Git complains if we don't do that
         git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
         .github/workflows/make-source-archive.py --output-directory .. --debian gzip
+
+    - name: Check out Debian sources
+      uses: actions/checkout@v4
+      with:
+        repository: equeim/tremotesf-debian
+        path: tremotesf-debian
+
+    - name: Remove everything except debian/ directory
+      run: |
+        mv tremotesf-debian/debian debian
+        rm -rf tremotesf-debian
+
+    - name: Install build dependencies
+      run: |
+        apt-get update && DEBIAN_FRONTEND=noninteractive apt-get --no-install-recommends --assume-yes build-dep .
 
     - name: Build DEB
       run: |
         dpkg-buildpackage
-
-  build-freebsd:
-    strategy:
-      fail-fast: false
-      matrix:
-        freebsd-version: ['12.4', '13.2']
-    env:
-      FREEBSD_VERSION: ${{ matrix.freebsd-version }}
-
-    runs-on: macos-latest
-    steps:
-    - name: Add GCC problem matcher
-      uses: ammaraskar/gcc-problem-matcher@master
-
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        submodules: 'recursive'
-
-    - name: Start FreeBSD VM
-      id: start-vm
-      continue-on-error: true
-      run: |
-        echo '::group::Starting VM'
-        VAGRANT_CWD="$GITHUB_WORKSPACE/.github/workflows" vagrant up --provider=virtualbox
-        echo '::endgroup'
-        echo '::group::Adding vagrant shell to PATH'
-        echo "$GITHUB_WORKSPACE/.github/workflows" >> "$GITHUB_PATH"
-        echo '::endgroup'
-
-    - name: Install dependencies
-      if: steps.start-vm.outcome == 'success'
-      shell: vagrant-freebsd-shell.sh {0}
-      run: |
-        sudo pkg update -f
-        sudo pkg install -y cmake ninja pkgconf libpsl libfmt cpp-httplib qt5-buildtools qt5-qmake qt5-core qt5-network qt5-concurrent qt5-testlib qt5-widgets qt5-dbus kf5-kwidgetsaddons kf5-kwindowsystem gettext-tools cxxopts
-
-    - name: Build for FreeBSD
-      if: steps.start-vm.outcome == 'success'
-      shell: vagrant-freebsd-shell.sh {0}
-      run: |
-        set -e -o pipefail
-        echo '::group::Configuring CMake'
-        cmake -S . --preset base
-        echo '::endgroup'
-        echo '::group::Building Debug'
-        cmake --build --preset base-debug
-        echo '::endgroup'
-        echo '::group::Testing Debug'
-        ctest --preset base-debug
-        echo '::endgroup'
-        echo '::group::Building Release'
-        cmake --build --preset base-release
-        echo '::endgroup'
-        echo '::group::Testing Release'
-        ctest --preset base-release
-        echo '::endgroup'
 
   build-flatpak:
     runs-on: ubuntu-latest
@@ -192,7 +155,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        toolchain: ['msvc', 'msvc-clang']
+        toolchain:
+        - msvc
+        #- msvc-clang
 
     uses: ./.github/workflows/build-windows-msvc.yml
     with:
@@ -266,6 +231,9 @@ jobs:
           echo '::group::Testing Release'
           ctest --preset base-release
           echo '::endgroup'
+
+  build-macos:
+    uses: ./.github/workflows/build-macos.yml
 
   reuse-lint:
     runs-on: ubuntu-latest

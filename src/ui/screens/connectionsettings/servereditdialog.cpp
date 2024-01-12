@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -39,7 +39,7 @@
 #include "target_os.h"
 #include "ui/widgets/commondelegate.h"
 #include "rpc/servers.h"
-#include "utils.h"
+#include "formatutils.h"
 #include "serversmodel.h"
 
 namespace tremotesf {
@@ -49,7 +49,8 @@ namespace tremotesf {
         constexpr std::array proxyTypeComboBoxValues{
             ConnectionConfiguration::ProxyType::Default,
             ConnectionConfiguration::ProxyType::Http,
-            ConnectionConfiguration::ProxyType::Socks5};
+            ConnectionConfiguration::ProxyType::Socks5
+        };
 
         ConnectionConfiguration::ProxyType proxyTypeFromComboBoxIndex(int index) {
             if (index == -1) {
@@ -71,7 +72,8 @@ namespace tremotesf {
             setHorizontalHeaderLabels({//: Column title in the list of mounted directories
                                        qApp->translate("tremotesf", "Local directory"),
                                        //: Column title in the list of mounted directories
-                                       qApp->translate("tremotesf", "Remote directory")});
+                                       qApp->translate("tremotesf", "Remote directory")
+            });
             horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
             horizontalHeader()->setSectionsClickable(false);
             verticalHeader()->setVisible(false);
@@ -142,6 +144,8 @@ namespace tremotesf {
                 if (state() != EditingState) {
                     edit(currentIndex());
                 }
+                break;
+            default:
                 break;
             }
         }
@@ -271,6 +275,7 @@ namespace tremotesf {
 
         auto proxyGroupBox = new QGroupBox(qApp->translate("tremotesf", "Proxy"), this);
         mProxyLayout = new QFormLayout(proxyGroupBox);
+        mProxyLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
 
         mProxyTypeComboBox = new QComboBox(this);
         mProxyTypeComboBox->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
@@ -380,6 +385,7 @@ namespace tremotesf {
         mAuthenticationGroupBox = new QGroupBox(qApp->translate("tremotesf", "Authentication"), this);
         mAuthenticationGroupBox->setCheckable(true);
         auto authenticationGroupBoxLayout = new QFormLayout(mAuthenticationGroupBox);
+        authenticationGroupBoxLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
         mUsernameLineEdit = new QLineEdit(this);
         authenticationGroupBoxLayout->addRow(qApp->translate("tremotesf", "Username:"), mUsernameLineEdit);
         mPasswordLineEdit = new QLineEdit(this);
@@ -575,7 +581,7 @@ namespace tremotesf {
             }
         });
 
-        if constexpr (isTargetOsWindows) {
+        if constexpr (targetOs == TargetOs::Windows) {
             fileDialog->open();
         } else {
             fileDialog->show();

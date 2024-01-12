@@ -1,10 +1,11 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "ipcserver_dbus_service.h"
 
 #include <QUrl>
+#include <KWindowSystem>
 
 #include "log/log.h"
 #include "tremotesf_dbus_generated/ipc/org.freedesktop.Application.adaptor.h"
@@ -16,6 +17,30 @@ SPECIALIZE_FORMATTER_FOR_QDEBUG(QVariantMap)
 SPECIALIZE_FORMATTER_FOR_QDEBUG(QVariantList)
 
 namespace tremotesf {
+    namespace {
+        std::optional<QByteArray> platformDataToWindowActivationToken(const QVariantMap& platformData) {
+            QLatin1String key{};
+            switch (KWindowSystem::platform()) {
+            case KWindowSystem::Platform::X11: {
+                key = IpcDbusService::desktopStartupIdField;
+                break;
+            }
+            case KWindowSystem::Platform::Wayland: {
+                key = IpcDbusService::xdgActivationTokenField;
+                break;
+            }
+            default:
+                logWarning("Unknown windowing system");
+                return {};
+            }
+            auto token = platformData.value(key).toByteArray();
+            if (token.isEmpty()) {
+                return {};
+            }
+            return token;
+        }
+    }
+
     IpcDbusService::IpcDbusService(IpcServerDbus* ipcServer, QObject* parent) : QObject(parent), mIpcServer(ipcServer) {
         new OrgFreedesktopApplicationAdaptor(this);
 
@@ -28,7 +53,7 @@ namespace tremotesf {
                 logWarning("Failed to register D-Bus object: {}", connection.lastError());
             }
         } else {
-            logWarning("Failed toregister D-Bus service", connection.lastError());
+            logWarning("Failed to register D-Bus service", connection.lastError());
         }
     }
 
@@ -39,7 +64,7 @@ namespace tremotesf {
         logInfo("Window activation requested, platform_data = {}", platform_data);
         emit mIpcServer->windowActivationRequested(
             platform_data.value(torrentHashField).toString(),
-            platform_data.value(desktopStartupIdField).toByteArray()
+            platformDataToWindowActivationToken(platform_data)
         );
     }
 
@@ -56,7 +81,7 @@ namespace tremotesf {
                 }
             }
         }
-        emit mIpcServer->torrentsAddingRequested(files, urls, platform_data.value(desktopStartupIdField).toByteArray());
+        emit mIpcServer->torrentsAddingRequested(files, urls, platformDataToWindowActivationToken(platform_data));
     }
 
     void IpcDbusService::ActivateAction(

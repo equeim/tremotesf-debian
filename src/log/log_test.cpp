@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -15,11 +15,11 @@
 
 #include <fmt/format.h>
 #include <fmt/compile.h>
+#include <fmt/ranges.h>
 
 #include "rpc/torrent.h"
 #include "log.h"
 
-SPECIALIZE_FORMATTER_FOR_QDEBUG(QStringList)
 SPECIALIZE_FORMATTER_FOR_QDEBUG(QVariant)
 
 using namespace tremotesf;

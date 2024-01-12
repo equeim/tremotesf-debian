@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -86,6 +86,7 @@ namespace tremotesf {
             return newTrackers.find(tracker.tracker);
         }
 
+        // NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
         bool updateItem(AllTrackersModel::TrackerItem& tracker, std::pair<const QString, int>&& newTracker) override {
             const auto& [site, torrents] = newTracker;
             if (tracker.torrents != torrents) {
@@ -95,6 +96,7 @@ namespace tremotesf {
             return false;
         }
 
+        // NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
         AllTrackersModel::TrackerItem createItemFromNewItem(std::pair<const QString, int>&& newTracker) override {
             return AllTrackersModel::TrackerItem{.tracker = newTracker.first, .torrents = newTracker.second};
         }

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -6,6 +6,8 @@
 #define TREMOTESF_IPCSERVER_SOCKET_H
 
 #include "ipcserver.h"
+
+class QLocalServer;
 
 namespace tremotesf {
     class IpcServerSocket final : public IpcServer {
@@ -18,6 +20,9 @@ namespace tremotesf {
         static constexpr char activateWindowMessage = '\0';
 
         static QByteArray createAddTorrentsMessage(const QStringList& files, const QStringList& urls);
+
+    private:
+        void listenToConnections(QLocalServer* server);
     };
 }
 

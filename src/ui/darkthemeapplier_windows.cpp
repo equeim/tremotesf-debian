@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -155,7 +155,8 @@ namespace tremotesf {
             return {
                 blend(source.red(), background.red()),
                 blend(source.green(), background.green()),
-                blend(source.blue(), background.blue())};
+                blend(source.blue(), background.blue())
+            };
         }
 
         double getRelativeLuminance(QColor color) {
@@ -291,10 +292,8 @@ namespace tremotesf {
                 }
                 throw std::logic_error("Unknown DarkThemeMode value");
             }();
-            const auto accentColors =
-                settings->useSystemAccentColor()
-                    ? systemColorsProvider->accentColors()
-                    : SystemColorsProvider::AccentColors{};
+            const auto accentColors = settings->useSystemAccentColor() ? systemColorsProvider->accentColors()
+                                                                       : SystemColorsProvider::AccentColors{};
             applyWindowsPalette(darkTheme, accentColors);
         };
         apply();

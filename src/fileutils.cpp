@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -7,12 +7,14 @@
 #include <span>
 #include <stdexcept>
 
+#include <QCoreApplication>
 #include <QFile>
 #include <QDir>
 #include <QStandardPaths>
 #include <QStringBuilder>
 
 #include "literals.h"
+#include "macoshelpers.h"
 #include "target_os.h"
 #include "log/log.h"
 
@@ -235,6 +237,17 @@ namespace tremotesf {
         }
     }
 
+    QString resolveExternalBundledResourcesPath(QLatin1String path) {
+        const QString root = [&] {
+            if constexpr (targetOs == TargetOs::UnixMacOS) {
+                return bundleResourcesPath();
+            } else {
+                return QCoreApplication::applicationDirPath();
+            }
+        }();
+        return root % '/' % path;
+    }
+
     namespace impl {
         QString readFileAsBase64String(QFile& file) {
             QString string{};
@@ -261,7 +274,7 @@ namespace tremotesf {
 
         namespace {
             constexpr auto sessionIdFileLocation = [] {
-                if constexpr (isTargetOsWindows) {
+                if constexpr (targetOs == TargetOs::Windows) {
                     return QStandardPaths::GenericDataLocation;
                 } else {
                     return QStandardPaths::TempLocation;
@@ -269,7 +282,7 @@ namespace tremotesf {
             }();
 
             constexpr QLatin1String sessionIdFilePrefix = [] {
-                if constexpr (isTargetOsWindows) {
+                if constexpr (targetOs == TargetOs::Windows) {
                     return "Transmission/tr_session_id_"_l1;
                 } else {
                     return "tr_session_id_"_l1;
@@ -278,17 +291,15 @@ namespace tremotesf {
         }
 
         bool isTransmissionSessionIdFileExists(const QByteArray& sessionId) {
-            if constexpr (targetOs != TargetOs::UnixAndroid) {
-                const auto file = QStandardPaths::locate(sessionIdFileLocation, sessionIdFilePrefix % sessionId);
-                if (!file.isEmpty()) {
-                    logInfo(
-                        "isSessionIdFileExists: found transmission-daemon session id file {}",
-                        QDir::toNativeSeparators(file)
-                    );
-                    return true;
-                }
-                logInfo("isSessionIdFileExists: did not find transmission-daemon session id file");
+            const auto file = QStandardPaths::locate(sessionIdFileLocation, sessionIdFilePrefix % sessionId);
+            if (!file.isEmpty()) {
+                logInfo(
+                    "isSessionIdFileExists: found transmission-daemon session id file {}",
+                    QDir::toNativeSeparators(file)
+                );
+                return true;
             }
+            logInfo("isSessionIdFileExists: did not find transmission-daemon session id file");
             return false;
         }
     }

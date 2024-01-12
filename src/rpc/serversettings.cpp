@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -86,7 +86,8 @@ namespace tremotesf {
         constexpr auto encryptionModeMapper = EnumMapper(std::array{
             EnumMapping(ServerSettingsData::EncryptionMode::Allowed, "tolerated"_l1),
             EnumMapping(ServerSettingsData::EncryptionMode::Preferred, "preferred"_l1),
-            EnumMapping(ServerSettingsData::EncryptionMode::Required, "required"_l1)});
+            EnumMapping(ServerSettingsData::EncryptionMode::Required, "required"_l1)
+        });
     }
 
     bool ServerSettingsData::canRenameFiles() const { return (rpcVersion >= 15); }

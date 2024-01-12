@@ -1,8 +1,8 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "utils.h"
+#include "formatutils.h"
 
 #include <array>
 #include <cmath>
@@ -15,7 +15,7 @@
 
 #include "fileutils.h"
 
-namespace tremotesf {
+namespace tremotesf::formatutils {
     namespace {
         enum class StringType { Size, Speed };
 
@@ -39,47 +39,56 @@ namespace tremotesf {
             ByteUnitStrings{//: Size suffix in bytes
                             [] { return qApp->translate("tremotesf", "%L1 B"); },
                             //: Download speed suffix in bytes per second
-                            [] { return qApp->translate("tremotesf", "%L1 B/s"); }},
+                            [] { return qApp->translate("tremotesf", "%L1 B/s"); }
+            },
             //: IEC 80000 binary prefixes, i.e. KiB = 1024 bytes
             ByteUnitStrings{//: Size suffix in kibibytes
                             [] { return qApp->translate("tremotesf", "%L1 KiB"); },
                             //: Download speed suffix in kibibytes per second
-                            [] { return qApp->translate("tremotesf", "%L1 KiB/s"); }},
+                            [] { return qApp->translate("tremotesf", "%L1 KiB/s"); }
+            },
             //: IEC 80000 binary prefixes, i.e. KiB = 1024 bytes
             ByteUnitStrings{//: Size suffix in mebibytes
                             [] { return qApp->translate("tremotesf", "%L1 MiB"); },
                             //: Download speed suffix in mebibytes per second
-                            [] { return qApp->translate("tremotesf", "%L1 MiB/s"); }},
+                            [] { return qApp->translate("tremotesf", "%L1 MiB/s"); }
+            },
             //: IEC 80000 binary prefixes, i.e. KiB = 1024 bytes
             ByteUnitStrings{//: Size suffix in gibibytes
                             [] { return qApp->translate("tremotesf", "%L1 GiB"); },
                             //: Download speed suffix in gibibytes per second
-                            [] { return qApp->translate("tremotesf", "%L1 GiB/s"); }},
+                            [] { return qApp->translate("tremotesf", "%L1 GiB/s"); }
+            },
             //: IEC 80000 binary prefixes, i.e. KiB = 1024 bytes
             ByteUnitStrings{//: Size suffix in tebibytes
                             [] { return qApp->translate("tremotesf", "%L1 TiB"); },
                             //: Download speed suffix in tebibytes per second
-                            [] { return qApp->translate("tremotesf", "%L1 TiB/s"); }},
+                            [] { return qApp->translate("tremotesf", "%L1 TiB/s"); }
+            },
             //: IEC 80000 binary prefixes, i.e. KiB = 1024 bytes
             ByteUnitStrings{//: Size suffix in pebibytes
                             [] { return qApp->translate("tremotesf", "%L1 PiB"); },
                             //: Download speed suffix in pebibytes per second
-                            [] { return qApp->translate("tremotesf", "%L1 PiB/s"); }},
+                            [] { return qApp->translate("tremotesf", "%L1 PiB/s"); }
+            },
             //: IEC 80000 binary prefixes, i.e. KiB = 1024 bytes
             ByteUnitStrings{//: Size suffix in exbibytes
                             [] { return qApp->translate("tremotesf", "%L1 EiB"); },
                             //: Download speed suffix in exbibytes per second
-                            [] { return qApp->translate("tremotesf", "%L1 EiB/s"); }},
+                            [] { return qApp->translate("tremotesf", "%L1 EiB/s"); }
+            },
             //: IEC 80000 binary prefixes, i.e. KiB = 1024 bytes
             ByteUnitStrings{//: Size suffix in zebibytes
                             [] { return qApp->translate("tremotesf", "%L1 ZiB"); },
                             //: Download speed suffix in zebibytes per second
-                            [] { return qApp->translate("tremotesf", "%L1 ZiB/s"); }},
+                            [] { return qApp->translate("tremotesf", "%L1 ZiB/s"); }
+            },
             //: IEC 80000 binary prefixes, i.e. KiB = 1024 bytes
             ByteUnitStrings{//: Size suffix in yobibytes
                             [] { return qApp->translate("tremotesf", "%L1 YiB"); },
                             //: Download speed suffix in yobibytes per second
-                            [] { return qApp->translate("tremotesf", "%L1 YiB/s"); }},
+                            [] { return qApp->translate("tremotesf", "%L1 YiB/s"); }
+            },
         };
         constexpr size_t maxByteUnit = byteUnits.size() - 1;
 
@@ -98,16 +107,16 @@ namespace tremotesf {
         }
     }
 
-    QString Utils::formatByteSize(long long size) { return formatBytes(size, StringType::Size); }
+    QString formatByteSize(long long size) { return formatBytes(size, StringType::Size); }
 
-    QString Utils::formatByteSpeed(long long speed) { return formatBytes(speed, StringType::Speed); }
+    QString formatByteSpeed(long long speed) { return formatBytes(speed, StringType::Speed); }
 
-    QString Utils::formatSpeedLimit(int limit) {
+    QString formatSpeedLimit(int limit) {
         //: Download speed suffix in kibibytes per second
         return qApp->translate("tremotesf", "%L1 KiB/s").arg(limit);
     }
 
-    QString Utils::formatProgress(double progress) {
+    QString formatProgress(double progress) {
         if (qFuzzyCompare(progress, 1.0)) {
             //: Progress in percents. %L1 must remain unchanged, % after it is a percent character
             return qApp->translate("tremotesf", "%L1%").arg(100);
@@ -116,7 +125,7 @@ namespace tremotesf {
         return qApp->translate("tremotesf", "%L1%").arg(std::trunc(progress * 1000.0) / 10.0, 0, 'f', 1);
     }
 
-    QString Utils::formatRatio(double ratio) {
+    QString formatRatio(double ratio) {
         if (ratio < 0) {
             return {};
         }
@@ -130,14 +139,14 @@ namespace tremotesf {
         return QLocale().toString(ratio, 'f', precision);
     }
 
-    QString Utils::formatRatio(long long downloaded, long long uploaded) {
+    QString formatRatio(long long downloaded, long long uploaded) {
         if (downloaded == 0) {
             return formatRatio(0);
         }
         return formatRatio(static_cast<double>(uploaded) / static_cast<double>(downloaded));
     }
 
-    QString Utils::formatEta(int seconds) {
+    QString formatEta(int seconds) {
         if (seconds < 0) {
             return "\u221E";
         }

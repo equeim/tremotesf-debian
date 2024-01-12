@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -32,12 +32,11 @@
 #include "stdutils.h"
 #include "torrentfilesmodel.h"
 #include "trackersviewwidget.h"
-#include "utils.h"
+#include "formatutils.h"
 #include "log/log.h"
 #include "rpc/pathutils.h"
 #include "rpc/rpc.h"
 #include "rpc/torrent.h"
-#include "ui/savewindowstatedispatcher.h"
 #include "ui/itemmodels/baseproxymodel.h"
 #include "ui/itemmodels/stringlistmodel.h"
 #include "ui/widgets/torrentfilesview.h"
@@ -48,17 +47,20 @@ SPECIALIZE_FORMATTER_FOR_QDEBUG(QRect)
 namespace tremotesf {
     namespace {
         constexpr TorrentData::Priority priorityComboBoxItems[] = {
-            TorrentData::Priority::High, TorrentData::Priority::Normal, TorrentData::Priority::Low};
+            TorrentData::Priority::High, TorrentData::Priority::Normal, TorrentData::Priority::Low
+        };
 
         constexpr TorrentData::RatioLimitMode ratioLimitComboBoxItems[] = {
             TorrentData::RatioLimitMode::Global,
             TorrentData::RatioLimitMode::Unlimited,
-            TorrentData::RatioLimitMode::Single};
+            TorrentData::RatioLimitMode::Single
+        };
 
         constexpr TorrentData::IdleSeedingLimitMode idleSeedingLimitComboBoxItems[] = {
             TorrentData::IdleSeedingLimitMode::Global,
             TorrentData::IdleSeedingLimitMode::Unlimited,
-            TorrentData::IdleSeedingLimitMode::Single};
+            TorrentData::IdleSeedingLimitMode::Single
+        };
     }
 
     TorrentPropertiesDialog::TorrentPropertiesDialog(Torrent* torrent, Rpc* rpc, QWidget* parent)
@@ -81,8 +83,13 @@ namespace tremotesf {
         layout->addWidget(mMessageWidget);
 
         setupDetailsTab();
-        //: Torrent properties dialog tab
-        mTabWidget->addTab(mFilesView, qApp->translate("tremotesf", "Files"));
+        {
+            const auto filesTab = new QWidget(this);
+            const auto filesTabLayout = new QVBoxLayout(filesTab);
+            filesTabLayout->addWidget(mFilesView);
+            //: Torrent properties dialog tab
+            mTabWidget->addTab(filesTab, qApp->translate("tremotesf", "Files"));
+        }
         //: Torrent properties dialog tab
         mTabWidget->addTab(mTrackersViewWidget, qApp->translate("tremotesf", "Trackers"));
         setupPeersTab();
@@ -106,8 +113,6 @@ namespace tremotesf {
 
         setMinimumSize(minimumSizeHint());
         restoreGeometry(Settings::instance()->torrentPropertiesDialogGeometry());
-
-        SaveWindowStateDispatcher::registerHandler(this, [this] { saveState(); });
     }
 
     QSize TorrentPropertiesDialog::sizeHint() const { return minimumSizeHint(); }
@@ -122,6 +127,7 @@ namespace tremotesf {
         //: Torrent's details tab section
         auto activityGroupBox = new QGroupBox(qApp->translate("tremotesf", "Activity"), this);
         auto activityGroupBoxLayout = new QFormLayout(activityGroupBox);
+        activityGroupBoxLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
         auto completedLabel = new QLabel(this);
         //: Torrent's completed size
         activityGroupBoxLayout->addRow(qApp->translate("tremotesf", "Completed:"), completedLabel);
@@ -165,6 +171,7 @@ namespace tremotesf {
         //: Torrent's details tab section
         auto infoGroupBox = new QGroupBox(qApp->translate("tremotesf", "Information"), this);
         auto infoGroupBoxLayout = new QFormLayout(infoGroupBox);
+        infoGroupBoxLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
         auto totalSizeLabel = new QLabel(this);
         infoGroupBoxLayout->addRow(qApp->translate("tremotesf", "Total size:"), totalSizeLabel);
         auto locationLabel = new QLabel(this);
@@ -197,16 +204,16 @@ namespace tremotesf {
             //: Torrent's completion size, e.g. 100 MiB of 200 MiB (50%). %1 is completed size, %2 is size, %3 is progress in percents
             completedLabel->setText(qApp->translate("tremotesf", "%1 of %2 (%3)")
                                         .arg(
-                                            Utils::formatByteSize(mTorrent->data().completedSize),
-                                            Utils::formatByteSize(mTorrent->data().sizeWhenDone),
-                                            Utils::formatProgress(mTorrent->data().percentDone)
+                                            formatutils::formatByteSize(mTorrent->data().completedSize),
+                                            formatutils::formatByteSize(mTorrent->data().sizeWhenDone),
+                                            formatutils::formatProgress(mTorrent->data().percentDone)
                                         ));
-            downloadedLabel->setText(Utils::formatByteSize(mTorrent->data().totalDownloaded));
-            uploadedLabel->setText(Utils::formatByteSize(mTorrent->data().totalUploaded));
-            ratioLabel->setText(Utils::formatRatio(mTorrent->data().ratio));
-            downloadSpeedLabel->setText(Utils::formatByteSpeed(mTorrent->data().downloadSpeed));
-            uploadSpeedLabel->setText(Utils::formatByteSpeed(mTorrent->data().uploadSpeed));
-            etaLabel->setText(Utils::formatEta(mTorrent->data().eta));
+            downloadedLabel->setText(formatutils::formatByteSize(mTorrent->data().totalDownloaded));
+            uploadedLabel->setText(formatutils::formatByteSize(mTorrent->data().totalUploaded));
+            ratioLabel->setText(formatutils::formatRatio(mTorrent->data().ratio));
+            downloadSpeedLabel->setText(formatutils::formatByteSpeed(mTorrent->data().downloadSpeed));
+            uploadSpeedLabel->setText(formatutils::formatByteSpeed(mTorrent->data().uploadSpeed));
+            etaLabel->setText(formatutils::formatEta(mTorrent->data().eta));
 
             const QLocale locale{};
             seedersLabel->setText(locale.toString(mTorrent->data().totalSeedersFromTrackersCount));
@@ -217,7 +224,7 @@ namespace tremotesf {
 
             lastActivityLabel->setText(mTorrent->data().activityDate.toLocalTime().toString());
 
-            totalSizeLabel->setText(Utils::formatByteSize(mTorrent->data().totalSize));
+            totalSizeLabel->setText(formatutils::formatByteSize(mTorrent->data().totalSize));
             locationLabel->setText(
                 toNativeSeparators(mTorrent->data().downloadDirectory, mRpc->serverSettings()->data().pathOs)
             );

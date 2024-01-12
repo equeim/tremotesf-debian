@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -31,7 +31,8 @@ namespace tremotesf {
             std::pair{SIGINT, "SIGINT"sv},
             std::pair{SIGTERM, "SIGTERM"sv},
             std::pair{SIGHUP, "SIGHUP"sv},
-            std::pair{SIGQUIT, "SIGQUIT"sv}};
+            std::pair{SIGQUIT, "SIGQUIT"sv}
+        };
 
         std::optional<std::string_view> signalName(int signal) {
             for (auto [expectedSignal, name] : expectedSignals) {
@@ -66,15 +67,9 @@ namespace tremotesf {
         }
     }
 
-    QString descriptorPath(int fd) {
-        return QFileInfo(QString::fromStdString(fmt::format("/proc/self/fd/{}", fd))).canonicalFilePath();
-    }
-
     class SignalHandler::Impl {
     public:
         Impl() {
-            logInfo("stdout = {}", descriptorPath(STDOUT_FILENO));
-            logInfo("stderr = {}", descriptorPath(STDERR_FILENO));
             try {
                 int sockets[2]{};
                 checkPosixError(socketpair(AF_UNIX, SOCK_STREAM, 0, static_cast<int*>(sockets)), "socketpair");

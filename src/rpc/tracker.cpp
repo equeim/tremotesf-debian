@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -25,7 +25,8 @@ namespace tremotesf {
             EnumMapping(Tracker::Status::Inactive, 0),
             EnumMapping(Tracker::Status::WaitingForUpdate, 1),
             EnumMapping(Tracker::Status::QueuedForUpdate, 2),
-            EnumMapping(Tracker::Status::Updating, 3)});
+            EnumMapping(Tracker::Status::Updating, 3)
+        });
     }
 
     Tracker::Tracker(int id, const QJsonObject& trackerMap) : mId(id) { update(trackerMap); }

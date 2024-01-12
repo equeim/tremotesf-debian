@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -8,10 +8,11 @@
 #include <QStatusBar>
 
 class QLabel;
-class KSeparator;
 
 namespace tremotesf {
     class Rpc;
+
+    class StatusBarSeparator;
 
     class MainWindowStatusBar final : public QStatusBar {
         Q_OBJECT
@@ -23,18 +24,32 @@ namespace tremotesf {
         void updateLayout();
         void updateServerLabel();
         void updateStatusLabels();
+        void showContextMenu();
 
         const Rpc* mRpc{};
         QLabel* mNoServersErrorImage{};
         QLabel* mServerLabel{};
-        KSeparator* mFirstSeparator{};
+        StatusBarSeparator* mFirstSeparator{};
         QLabel* mStatusLabel{};
-        KSeparator* mSecondSeparator{};
+        StatusBarSeparator* mSecondSeparator{};
         QLabel* mDownloadSpeedImage{};
         QLabel* mDownloadSpeedLabel{};
-        KSeparator* mThirdSeparator{};
+        StatusBarSeparator* mThirdSeparator{};
         QLabel* mUploadSpeedImage{};
         QLabel* mUploadSpeedLabel{};
+
+    signals:
+        void showConnectionSettingsDialog();
+    };
+
+    class StatusBarSeparator final : public QWidget {
+        Q_OBJECT
+    public:
+        explicit StatusBarSeparator(QWidget* parent = nullptr);
+        QSize sizeHint() const override;
+
+    protected:
+        void paintEvent(QPaintEvent* event) override;
     };
 }
 

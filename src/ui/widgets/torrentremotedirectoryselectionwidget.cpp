@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -16,6 +16,9 @@
 
 namespace tremotesf {
     void TorrentDownloadDirectoryDirectorySelectionWidgetViewModel::saveDirectories() {
+        if (mPath.isEmpty()) {
+            return;
+        }
         auto paths = createTransforming<QStringList>(mComboBoxItems, [](const auto& item) { return item.path; });
         if (!paths.contains(mPath)) {
             paths.push_back(mPath);
@@ -53,7 +56,8 @@ namespace tremotesf {
                     QString display = toNativeSeparators(dir);
                     return TorrentDownloadDirectoryDirectorySelectionWidgetViewModel::ComboBoxItem{
                         .path = std::move(dir),
-                        .displayPath = std::move(display)};
+                        .displayPath = std::move(display)
+                    };
                 }
             );
         return ret;

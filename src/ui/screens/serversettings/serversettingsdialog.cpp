@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -37,7 +37,8 @@ namespace tremotesf {
         constexpr std::array encryptionModeComboBoxItems{
             ServerSettingsData::EncryptionMode::Allowed,
             ServerSettingsData::EncryptionMode::Preferred,
-            ServerSettingsData::EncryptionMode::Required};
+            ServerSettingsData::EncryptionMode::Required
+        };
 
         ServerSettingsData::EncryptionMode encryptionModeFromComboBoxItem(int index) {
             if (index == -1) {
@@ -162,6 +163,7 @@ namespace tremotesf {
         downloadingPageItem->setIcon(QIcon::fromTheme("folder-download"_l1));
 
         auto downloadingPageLayout = new QFormLayout(mDownloadingPageWidget);
+        downloadingPageLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
 
         mDownloadDirectoryWidget = new RemoteDirectorySelectionWidget(this);
         mDownloadDirectoryWidget->setup({}, mRpc);

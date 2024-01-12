@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -6,6 +6,8 @@
 #include <QTest>
 
 #include "pathutils.h"
+
+// NOLINTBEGIN(cppcoreguidelines-avoid-do-while)
 
 using namespace tremotesf;
 
@@ -66,7 +68,8 @@ private slots:
             // Weird cases from the top of my head
             NormalizeTestCase{"d:", "D:", PathOs::Windows},
             NormalizeTestCase{"d:foo", "D:foo", PathOs::Windows},
-            NormalizeTestCase{R"(c::\wtf)", R"(C::/wtf)", PathOs::Windows}};
+            NormalizeTestCase{R"(c::\wtf)", R"(C::/wtf)", PathOs::Windows}
+        };
 
         for (const auto& [inputPath, expectedNormalizedPath, pathOs] : testCases) {
             QCOMPARE(normalizePath(inputPath, pathOs), expectedNormalizedPath);
@@ -81,7 +84,8 @@ private slots:
             NativeSeparatorsTestCase{"C:/", R"(C:\)", PathOs::Windows},
             NativeSeparatorsTestCase{"C:/home/foo", R"(C:\home\foo)", PathOs::Windows},
             NativeSeparatorsTestCase{R"(//LOCALHOST/c$/home/foo)", R"(\\LOCALHOST\c$\home\foo)", PathOs::Windows},
-            NativeSeparatorsTestCase{R"(C::/wtf)", R"(C::\wtf)", PathOs::Windows}};
+            NativeSeparatorsTestCase{R"(C::/wtf)", R"(C::\wtf)", PathOs::Windows}
+        };
         for (const auto& [inputPath, expectedNativeSeparatorsPath, pathOs] : testCases) {
             QCOMPARE(toNativeSeparators(inputPath, pathOs), expectedNativeSeparatorsPath);
         }

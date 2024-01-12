@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2023 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
 // SPDX-FileCopyrightText: 2021 LuK1337
 // SPDX-FileCopyrightText: 2022 Alex <tabell@users.noreply.github.com>
 //
@@ -13,11 +13,11 @@
 
 #include "log/log.h"
 #include "target_os.h"
-#include "ui/systemcolorsprovider.h"
 
 SPECIALIZE_FORMATTER_FOR_Q_ENUM(Qt::ToolButtonStyle)
 SPECIALIZE_FORMATTER_FOR_Q_ENUM(tremotesf::TorrentsProxyModel::StatusFilter)
 SPECIALIZE_FORMATTER_FOR_Q_ENUM(tremotesf::Settings::DarkThemeMode)
+SPECIALIZE_FORMATTER_FOR_Q_ENUM(tremotesf::Settings::TorrentDoubleClickAction)
 
 #define SETTINGS_PROPERTY_DEF_IMPL(type, getter, setterType, setter, key, defaultValue)    \
     type Settings::getter() const { return getValue<type>(mSettings, key, defaultValue); } \
@@ -121,6 +121,16 @@ namespace tremotesf {
     )
 
     SETTINGS_PROPERTY_DEF_TRIVIAL(
+        bool,
+        showMainWindowWhenAddingTorrent,
+        setShowMainWindowWhenAddingTorrent,
+        "showMainWindowWhenAddingTorrent",
+        true
+    )
+
+    SETTINGS_PROPERTY_DEF_TRIVIAL(bool, showAddTorrentDialog, setShowAddTorrentDialog, "showAddTorrentDialog", true)
+
+    SETTINGS_PROPERTY_DEF_TRIVIAL(
         bool, isTorrentsStatusFilterEnabled, setTorrentsStatusFilterEnabled, "torrentsStatusFilterEnabled", true
     )
     SETTINGS_PROPERTY_DEF_TRIVIAL(
@@ -196,9 +206,16 @@ namespace tremotesf {
         Settings::DarkThemeMode, darkThemeMode, setDarkThemeMode, "darkThemeMode", Settings::DarkThemeMode::FollowSystem
     )
     SETTINGS_PROPERTY_DEF_TRIVIAL(bool, useSystemAccentColor, setUseSystemAccentColor, "useSystemAccentColor", true)
+    SETTINGS_PROPERTY_DEF_TRIVIAL(
+        Settings::TorrentDoubleClickAction,
+        torrentDoubleClickAction,
+        setTorrentDoubleClickAction,
+        "torrentDoubleClickAction",
+        Settings::TorrentDoubleClickAction::OpenPropertiesDialog
+    )
 
     Settings::Settings(QObject* parent) : QObject(parent) {
-        if constexpr (isTargetOsWindows) {
+        if constexpr (targetOs == TargetOs::Windows) {
             mSettings = new QSettings(
                 QSettings::IniFormat,
                 QSettings::UserScope,
@@ -209,15 +226,18 @@ namespace tremotesf {
         } else {
             mSettings = new QSettings(this);
         }
+        mSettings->setFallbacksEnabled(false);
         qRegisterMetaType<Qt::ToolButtonStyle>();
         qRegisterMetaType<TorrentData::Priority>();
         qRegisterMetaType<TorrentsProxyModel::StatusFilter>();
         qRegisterMetaType<Settings::DarkThemeMode>();
+        qRegisterMetaType<Settings::TorrentDoubleClickAction>();
 #if QT_VERSION_MAJOR < 6
         qRegisterMetaTypeStreamOperators<Qt::ToolButtonStyle>();
         qRegisterMetaTypeStreamOperators<TorrentData::Priority>();
         qRegisterMetaTypeStreamOperators<TorrentsProxyModel::StatusFilter>();
         qRegisterMetaTypeStreamOperators<Settings::DarkThemeMode>();
+        qRegisterMetaTypeStreamOperators<Settings::TorrentDoubleClickAction>();
 #endif
     }
 
