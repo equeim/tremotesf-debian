@@ -1,3 +1,9 @@
+tremotesf (2.6.0-3) unstable; urgency=medium
+
+  * Disable Qt 6
+
+ -- Alexey Rochev <equeim@gmail.com>  Fri, 08 Mar 2024 10:00:00 +0000
+
 tremotesf (2.6.0-2) unstable; urgency=medium
 
   * Add kwayland-integration dependency
