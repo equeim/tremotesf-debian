@@ -131,16 +131,14 @@ namespace tremotesf {
 
                 layout->addWidget(dialogButtonBox);
 
-                setMinimumSize(minimumSizeHint());
-
                 QObject::connect(rpc, &Rpc::connectedChanged, this, [rpc, this] {
                     if (!rpc->isConnected()) {
                         reject();
                     }
                 });
-            }
 
-            [[nodiscard]] QSize sizeHint() const override { return QDialog::sizeHint().expandedTo(QSize(320, 0)); }
+                resize(sizeHint().expandedTo(QSize(320, 0)));
+            }
 
             [[nodiscard]] QString downloadDirectory() const { return mDirectoryWidget->path(); }
 
@@ -233,15 +231,6 @@ namespace tremotesf {
 
             setupActions();
 
-            updateRpcActions();
-            QObject::connect(mViewModel.rpc(), &Rpc::connectionStateChanged, this, &MainWindow::Impl::updateRpcActions);
-            QObject::connect(
-                Servers::instance(),
-                &Servers::hasServersChanged,
-                this,
-                &MainWindow::Impl::updateRpcActions
-            );
-
             updateTorrentActions();
             QObject::connect(mViewModel.rpc(), &Rpc::torrentsUpdated, this, &MainWindow::Impl::updateTorrentActions);
             QObject::connect(
@@ -256,6 +245,15 @@ namespace tremotesf {
 
             setupTrayIcon();
             mViewModel.setupNotificationsController(&mTrayIcon);
+
+            updateRpcActions();
+            QObject::connect(mViewModel.rpc(), &Rpc::connectionStateChanged, this, &MainWindow::Impl::updateRpcActions);
+            QObject::connect(
+                Servers::instance(),
+                &Servers::hasServersChanged,
+                this,
+                &MainWindow::Impl::updateRpcActions
+            );
 
             mWindow->restoreState(Settings::instance()->mainWindowState());
             mToolBarAction->setChecked(!mToolBar.isHidden());
@@ -283,7 +281,7 @@ namespace tremotesf {
                     [this] {
                         auto* const dialog = new ServerEditDialog(nullptr, -1, mWindow);
                         dialog->setAttribute(Qt::WA_DeleteOnClose);
-                        dialog->open();
+                        dialog->show();
                     },
                     Qt::QueuedConnection
                 );
@@ -327,7 +325,12 @@ namespace tremotesf {
             // Call it on the next event loop iteration
             QMetaObject::invokeMethod(
                 this,
-                [this] { mWindow->restoreGeometry(Settings::instance()->mainWindowGeometry()); },
+                [this] {
+                    if (!mWindow->restoreGeometry(Settings::instance()->mainWindowGeometry())) {
+                        mWindow->resize(mWindow->sizeHint().expandedTo(QSize(896, 640)));
+                    }
+                    mWindow->restoreGeometry(Settings::instance()->mainWindowGeometry());
+                },
                 Qt::QueuedConnection
             );
         }
@@ -622,7 +625,7 @@ namespace tremotesf {
             mOpenTorrentDownloadDirectoryAction = mTorrentMenu->addAction(
                 QIcon::fromTheme("go-jump"_l1),
                 //: Torrent's context menu item
-                qApp->translate("tremotesf", "Open &Download Directory")
+                qApp->translate("tremotesf", "Op&en Download Directory")
             );
             QObject::connect(
                 mOpenTorrentDownloadDirectoryAction,
@@ -1660,8 +1663,6 @@ namespace tremotesf {
     }
 
     MainWindow::~MainWindow() = default;
-
-    QSize MainWindow::sizeHint() const { return minimumSizeHint().expandedTo(QSize(896, 640)); }
 
     void MainWindow::initialShow(bool minimized) {
         if (!(minimized && Settings::instance()->showTrayIcon() && QSystemTrayIcon::isSystemTrayAvailable())) {

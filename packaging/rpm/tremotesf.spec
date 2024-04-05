@@ -4,11 +4,14 @@
 
 %global app_id org.equeim.Tremotesf
 
-%bcond qt6 0
-%global qt_version %[%{with qt6} ? 6 : 5]
+%if %{defined suse_version} || 0%{?fedora} >= 40
+%global qt_version 6
+%else
+%global qt_version 5
+%endif
 
 Name:       tremotesf
-Version:    2.6.0
+Version:    2.6.2
 Release:    1%{!?suse_version:%{?dist}}
 Summary:    Remote GUI for transmission-daemon
 %if %{defined suse_version}
@@ -45,11 +48,15 @@ BuildRequires: openssl-devel
 %if %{defined fedora}
 BuildRequires: cmake(httplib)
 BuildRequires: libappstream-glib
-%if  "%{toolchain}" == "clang"
+%if "%{toolchain}" == "clang"
 BuildRequires: clang
 %else
 BuildRequires: gcc-c++
 %endif
+%if %{qt_version} == 5
+Requires: kwayland-integration
+%endif
+%global tremotesf_with_httplib system
 %endif
 
 %if %{defined suse_version}
@@ -58,10 +65,15 @@ BuildRequires: appstream-glib
 # OBS complains about not owned directories if hicolor-icon-theme isn't installed at build time
 BuildRequires: hicolor-icon-theme
 %global _metainfodir %{_datadir}/metainfo
+%global tremotesf_with_httplib system
 %endif
 
 %if %{defined mageia}
 BuildRequires: appstream-util
+%if %{qt_version} == 5
+Requires: kwayland-integration
+%endif
+%global tremotesf_with_httplib bundled
 %endif
 
 %description
@@ -73,7 +85,7 @@ Remote GUI for Transmission BitTorrent client.
 
 
 %build
-%cmake -D TREMOTESF_QT6=%[%{with qt6} ? "ON" : "OFF"]
+%cmake -D TREMOTESF_QT6=%[%{qt_version} == 6 ? "ON" : "OFF"] -D TREMOTESF_WITH_HTTPLIB=%{tremotesf_with_httplib}
 %cmake_build
 
 %check
@@ -91,6 +103,12 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{app_id}.desktop
 %{_metainfodir}/%{app_id}.appdata.xml
 
 %changelog
+* Mon Apr 01 2024 Alexey Rochev <equeim@gmail.com> - 2.6.2-1
+- tremotesf-2.6.2
+
+* Sun Mar 17 2024 Alexey Rochev <equeim@gmail.com> - 2.6.1-1
+- tremotesf-2.6.1
+
 * Mon Jan 08 2024 Alexey Rochev <equeim@gmail.com> - 2.6.0-1
 - tremotesf-2.6.0
 

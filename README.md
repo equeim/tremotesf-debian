@@ -23,7 +23,7 @@ Table of Contents
   2. Clang 11 with libstdc++ 10
   3. Clang 13 with libc++ 13
 - CMake 3.16 or newer (3.21 on Windows)
-- Qt 5.15 (Core, Network, Concurrent, Gui, Widgets modules)
+- Qt 6.6 or newer or 5.15 (Core, Network, Concurrent, Gui, Widgets modules)
 - fmt 7.0 or newer
 - KWidgetsAddons
 - libpsl
@@ -35,7 +35,7 @@ Table of Contents
 On GNU/Linux and BSD, also:
 - Gettext 0.19.7 or newer
 - Qt D-Bus module
-- KWindowSystem
+- KWindowSystem (with Qt5/KF5 kwayland-integration is also needed as runtime dependency)
 
 On Windows, also:
 - Windows 11 SDK is needed to build
@@ -53,6 +53,16 @@ cmake --install /path/to/build/directory --config Debug --prefix /path/to/instal
 ```
 This example uses base-multi preset in CMakePresets.json and Ninja Multi-Config generator.
 You can invoke CMake in a different way if you want.
+
+CMake configuration options:
+
+`TREMOTESF_QT6` - boolean, determines whether Qt 6 or Qt 5 will be used.
+
+`TREMOTESF_WITH_HTTPLIB` - determines how cpp-httplib test dependency is searched. Possible values:
+  - auto: CMake find_package call, otherwise pkg-config, otherwise bundled copy is used.
+  - system: CMake find_package call, otherwise pkg-config, otherwise fatal error.
+  - bundled: bundled copy is used.
+  - none: cpp-httplib is not used at all and tests that require it are disabled.
 
 ### GNU/Linux
 - Flatpak - [Flathub](https://flathub.org/apps/details/org.equeim.Tremotesf)

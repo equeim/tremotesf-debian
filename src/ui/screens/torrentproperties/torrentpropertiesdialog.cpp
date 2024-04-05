@@ -111,11 +111,8 @@ namespace tremotesf {
 
         onTorrentChanged();
 
-        setMinimumSize(minimumSizeHint());
         restoreGeometry(Settings::instance()->torrentPropertiesDialogGeometry());
     }
-
-    QSize TorrentPropertiesDialog::sizeHint() const { return minimumSizeHint(); }
 
     void TorrentPropertiesDialog::setupDetailsTab() {
         auto detailsTab = new QWidget(this);
