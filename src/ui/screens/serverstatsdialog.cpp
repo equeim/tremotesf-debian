@@ -90,7 +90,7 @@ namespace tremotesf {
         QObject::connect(dialogButtonBox, &QDialogButtonBox::rejected, this, &ServerStatsDialog::reject);
         layout->addWidget(dialogButtonBox);
 
-        setMinimumSize(minimumSizeHint());
+        resize(sizeHint().expandedTo(QSize(300, 320)));
 
         QObject::connect(rpc, &Rpc::connectedChanged, this, [=] {
             if (rpc->isConnected()) {
@@ -129,6 +129,4 @@ namespace tremotesf {
         });
         update();
     }
-
-    QSize ServerStatsDialog::sizeHint() const { return minimumSizeHint().expandedTo(QSize(300, 320)); }
 }

@@ -1,5 +1,29 @@
 # Changelog
 
+## [2.6.2] - 2024-04-01
+### Fixed
+- Application being closed when opening file picker in Qt 6 builds
+
+## [2.6.1] - 2024-03-17
+### Added
+- Added TREMOTESF_WITH_HTTPLIB CMake option to control how cpp-httplib test dependency is searched. Possible values:
+  - auto: CMake find_package call, otherwise pkg-config, otherwise bundled copy is used.
+  - system: CMake find_package call, otherwise pkg-config, otherwise fatal error.
+  - bundled: bundled copy is used.
+  - none: cpp-httplib is not used at all and tests that require it are disabled.
+
+### Changed
+- Qt 6 is now used by default instead of Qt 5. You can override it with TREMOTESF_QT6=OFF CMake option
+- Flatpak build uses Qt 6
+- openSUSE build uses Qt 6
+
+### Fixed
+- Clarified dependency on kwayland-integration
+- Sorting of directories and trackers in side panel
+- Menu items that should disabled on first start not being disabled
+- Selecting of current server via status bar context menu being broken in some cases
+- Debug logs being printed when they are disabled
+
 ## [2.6.0] - 2024-01-08
 ### Added
 - macOS support
@@ -7,7 +31,7 @@
 - Option to not activate main window when adding torrents (except on macOS where application is always activated)
 - Option to not show "Add Torrent" dialog when adding torrents
 - Right click on status bar opens menu to quickly connect to different server
-- Support of xdg-activation protocol on Wayland
+- Support of xdg-activation protocol on Wayland (kwayland-integration is required as a runtime dependency)
 
 ### Changed
 - "Open" and "Show in file manager" actions now show error dialog if file/directory does not exist,

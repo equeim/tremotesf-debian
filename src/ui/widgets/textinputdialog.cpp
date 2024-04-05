@@ -67,10 +67,8 @@ namespace tremotesf {
 
         layout->addWidget(dialogButtonBox);
 
-        setMinimumSize(minimumSizeHint());
+        resize(sizeHint().expandedTo(QSize(256, 0)));
     }
-
-    QSize TextInputDialog::sizeHint() const { return minimumSizeHint().expandedTo(QSize(256, 0)); }
 
     QString TextInputDialog::text() const { return mLineEdit ? mLineEdit->text() : mPlainTextEdit->toPlainText(); }
 }

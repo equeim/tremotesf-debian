@@ -19,16 +19,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        container-image: ['fedora:38', 'fedora:39', 'opensuse/tumbleweed:latest']
+        container-image: ['fedora:38', 'fedora:39', 'fedora:40', 'opensuse/tumbleweed:latest']
         compiler: [gcc]
-        qt-version: [5]
         include:
         - container-image: 'fedora:38'
           compiler: clang
         - container-image: 'fedora:39'
           compiler: clang
-        - container-image: 'opensuse/tumbleweed:latest'
-          qt-version: 6
+        - container-image: 'fedora:40'
+          compiler: clang
 
     runs-on: ubuntu-latest
     container: ${{ matrix.container-image }}
@@ -43,7 +42,7 @@ jobs:
 
     - name: Set packages install command for zypper
       if: startsWith(matrix.container-image, 'opensuse')
-      run: echo 'INSTALL_PACKAGES=zypper --non-interactive --gpg-auto-import-keys in --no-recommends' >> "$GITHUB_ENV"
+      run: echo 'INSTALL_PACKAGES=zypper --non-interactive in --no-recommends --details' >> "$GITHUB_ENV"
 
     - name: Install Git and rpm-build
       run: ${{env.INSTALL_PACKAGES}} git rpm-build
@@ -59,14 +58,9 @@ jobs:
       run: |
         echo "rpm-macro=--define 'toolchain ${{ matrix.compiler }}'" >> "$GITHUB_OUTPUT"
 
-    - name: Add KF6 repository
-      if: startsWith(matrix.container-image, 'opensuse') && matrix.qt-version == 6
-      run: |
-        zypper ar https://download.opensuse.org/repositories/KDE:/Unstable:/Frameworks/openSUSE_Factory/KDE:Unstable:Frameworks.repo
-
     - name: Install build dependencies
       run: |
-        readarray -t dependencies < <(rpmspec ${{steps.fedora-compiler.outputs.rpm-macro}} ${{ matrix.qt-version == 6 && '--define "with_qt6 1"' || '' }} -q --srpm --qf '[%{REQUIRES}\n]' packaging/rpm/tremotesf.spec)
+        readarray -t dependencies < <(rpmspec ${{steps.fedora-compiler.outputs.rpm-macro}} -q --srpm --qf '[%{REQUIRES}\n]' packaging/rpm/tremotesf.spec)
         ${{env.INSTALL_PACKAGES}} "${dependencies[@]}"
 
     - name: Make source archive
@@ -80,7 +74,7 @@ jobs:
 
     - name: Build RPM
       run: |
-        rpmbuild ${{steps.fedora-compiler.outputs.rpm-macro}} --${{ matrix.qt-version == 6 && 'with' || 'without' }} qt6 -bb packaging/rpm/tremotesf.spec
+        rpmbuild ${{steps.fedora-compiler.outputs.rpm-macro}} -bb packaging/rpm/tremotesf.spec
 
   build-deb:
     strategy:
@@ -157,7 +151,7 @@ jobs:
       matrix:
         toolchain:
         - msvc
-        #- msvc-clang
+        - msvc-clang
 
     uses: ./.github/workflows/build-windows-msvc.yml
     with:
@@ -171,12 +165,6 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: 'recursive'
-
-    - name: Checkout msys2-packages
-      uses: actions/checkout@v4
-      with:
-        repository: equeim/msys2-packages
-        path: msys2-packages
 
     - name: Set up MSYS2
       uses: msys2/setup-msys2@v2
@@ -195,14 +183,7 @@ jobs:
           mingw-w64-clang-x86_64-qt6-tools
           mingw-w64-clang-x86_64-qt6-translations
           mingw-w64-clang-x86_64-cxxopts
-
-    - name: Build KF6 dependencies
-      shell: msys2 {0}
-      run: |
-        cd "$GITHUB_WORKSPACE/msys2-packages/mingw-w64-extra-cmake-modules-qt6"
-        makepkg-mingw --cleanbuild --syncdeps --force --noconfirm --install
-        cd "$GITHUB_WORKSPACE/msys2-packages/mingw-w64-kwidgetsaddons-qt6"
-        makepkg-mingw --cleanbuild --syncdeps --force --noconfirm --install
+          mingw-w64-clang-x86_64-kwidgetsaddons
 
     - name: Generate C++/WinRT headers
       shell: msys2 {0}
@@ -217,7 +198,7 @@ jobs:
       run: |
           set -e -o pipefail
           echo '::group::Configuring CMake'
-          cmake -S . --preset base -D TREMOTESF_QT6=ON
+          cmake -S . --preset base -D TREMOTESF_QT6=ON -D TREMOTESF_WITH_HTTPLIB=bundled
           echo '::endgroup'
           echo '::group::Building Debug'
           cmake --build --preset base-debug
