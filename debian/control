@@ -4,10 +4,6 @@ Section: net
 Priority: optional
 Build-Depends: cmake,
                debhelper-compat (= 13),
-               dh-cmake,
-               dh-cmake-compat (= 1),
-               dh-sequence-cmake,
-               dh-sequence-ctest,
                gettext,
                libcpp-httplib-dev,
                libcxxopts-dev,
