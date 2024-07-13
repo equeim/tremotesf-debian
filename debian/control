@@ -23,7 +23,7 @@ Vcs-Browser: https://salsa.debian.org/debian/tremotesf
 
 Package: tremotesf
 Architecture: any
-Depends: ${misc:Depends}, ${shlibs:Depends}, kwayland-integration,
+Depends: ${misc:Depends}, ${shlibs:Depends}, kwayland-integration, libqt5svg5, breeze-icon-theme
 Suggests: transmission-daemon,
 Description: Remote GUI for transmission-daemon
  Tremotesf is yet another, but modern (first-released in 2016)
