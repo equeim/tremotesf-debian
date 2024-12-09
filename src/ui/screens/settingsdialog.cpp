@@ -26,10 +26,13 @@
 #include "target_os.h"
 #include "settings.h"
 #include "rpc/rpc.h"
-#include "ui/systemcolorsprovider.h"
 #include "ui/screens/addtorrent/addtorrentdialog.h"
 #include "ui/screens/addtorrent/addtorrenthelpers.h"
 #include "ui/widgets/torrentremotedirectoryselectionwidget.h"
+
+#ifdef Q_OS_WIN
+#    include "ui/systemcolorsprovider.h"
+#endif
 
 namespace tremotesf {
     namespace {
@@ -134,11 +137,8 @@ namespace tremotesf {
         auto addTorrentParametersGroupBox = new QGroupBox(qApp->translate("tremotesf", "Add torrent parameters"), this);
         auto addTorrentParametersGroupBoxLayout = new QFormLayout(addTorrentParametersGroupBox);
         addTorrentParametersGroupBoxLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
-        const auto addTorrentParametersWidgets = AddTorrentDialog::createAddTorrentParametersWidgets(
-            AddTorrentDialog::Mode::File,
-            addTorrentParametersGroupBoxLayout,
-            rpc
-        );
+        const auto addTorrentParametersWidgets =
+            AddTorrentDialog::createAddTorrentParametersWidgets(true, addTorrentParametersGroupBoxLayout, rpc);
         auto addTorrentParametersResetButton = new QPushButton(qApp->translate("tremotesf", "Reset"), this);
         addTorrentParametersGroupBoxLayout->addRow(addTorrentParametersResetButton);
 
@@ -175,6 +175,26 @@ namespace tremotesf {
                 .arg(QKeySequence(QKeySequence::Paste).toString(QKeySequence::NativeText))
         );
         addTorrentsGroupBoxLayout->addWidget(pasteTipLabel);
+
+        auto askForMergingTrackersCheckBox = new QCheckBox(
+            //: Check box label
+            qApp->translate("tremotesf", "Ask for merging trackers when adding existing torrent"),
+            this
+        );
+        addTorrentsGroupBoxLayout->addWidget(askForMergingTrackersCheckBox);
+
+        auto mergeTrackersCheckBox = new QCheckBox(
+            //: Check box label
+            qApp->translate("tremotesf", "Merge trackers when adding existing torrent"),
+            this
+        );
+        addTorrentsGroupBoxLayout->addWidget(mergeTrackersCheckBox);
+        QObject::connect(
+            askForMergingTrackersCheckBox,
+            &QCheckBox::toggled,
+            mergeTrackersCheckBox,
+            [mergeTrackersCheckBox](bool checked) { mergeTrackersCheckBox->setEnabled(!checked); }
+        );
 
         layout->addWidget(addTorrentsGroupBox);
 
@@ -299,6 +319,9 @@ namespace tremotesf {
         }
         showDialogWhenAddingTorrentsCheckBox->setChecked(settings->showAddTorrentDialog());
         fillTorrentLinkFromKeyboardCheckBox->setChecked(settings->fillTorrentLinkFromClipboard());
+        askForMergingTrackersCheckBox->setChecked(settings->askForMergingTrackersWhenAddingExistingTorrent());
+        mergeTrackersCheckBox->setChecked(settings->mergeTrackersWhenAddingExistingTorrent());
+        mergeTrackersCheckBox->setEnabled(!askForMergingTrackersCheckBox->isChecked());
         notificationOnDisconnectingCheckBox->setChecked(settings->notificationOnDisconnecting());
         notificationOnAddingTorrentCheckBox->setChecked(settings->notificationOnAddingTorrent());
         notificationOfFinishedTorrentsCheckBox->setChecked(settings->notificationOfFinishedTorrents());
@@ -327,6 +350,8 @@ namespace tremotesf {
             }
             settings->setShowAddTorrentDialog(showDialogWhenAddingTorrentsCheckBox->isChecked());
             settings->setFillTorrentLinkFromClipboard(fillTorrentLinkFromKeyboardCheckBox->isChecked());
+            settings->setAskForMergingTrackersWhenAddingExistingTorrent(askForMergingTrackersCheckBox->isChecked());
+            settings->setMergeTrackersWhenAddingExistingTorrent(mergeTrackersCheckBox->isChecked());
             settings->setTorrentDoubleClickAction(
                 torrentDoubleClickActionFromComboBoxIndex(torrentDoubleClickActionComboBox->currentIndex())
             );

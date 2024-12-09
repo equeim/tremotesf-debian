@@ -19,12 +19,15 @@
 #include <QStandardPaths>
 #include <QString>
 
+#include <fmt/format.h>
+
 #include <windows.h>
 
 #include "fileutils.h"
 #include "literals.h"
 #include "log/log.h"
 #include "windowshelpers.h"
+#include "windowsfatalerrorhandlers.h"
 
 namespace fs = std::filesystem;
 
@@ -77,25 +80,27 @@ namespace tremotesf {
             // We are not doing this in destructor because we need
             // thread to be able to call logMessage() while we are joining it
             void finishWriting() {
-                logInfo("FileLogger: finishing logging");
-                logDebug("FileLogger: wait until thread started writing or finished with error");
+                info().log("FileLogger: finishing logging");
+                debug().log("FileLogger: wait until thread started writing or finished with error");
                 {
                     std::unique_lock lock(mMutex);
                     mCv.wait(lock, [&] { return mStartedWriting || mFinishedWriting; });
                 }
-                logDebug("FileLogger: cancelling new messages");
+                debug().log("FileLogger: cancelling new messages");
                 mQueue.cancelNewMessages();
-                logDebug("FileLogger: joining write thread");
+                debug().log("FileLogger: joining write thread");
                 mWriteThread.join();
-                logDebug("FileLogger: joined write thread");
+                debug().log("FileLogger: joined write thread");
             }
 
         private:
             void writeMessagesToFile() {
-                logDebug("FileLogger: started write thread");
+                windowsSetUpFatalErrorHandlersInThread();
+
+                debug().log("FileLogger: started write thread");
 
                 auto finishGuard = QScopeGuard([this] {
-                    logDebug("FileLogger: finished write thread");
+                    debug().log("FileLogger: finished write thread");
                     mQueue.cancelNewMessages();
                     {
                         const std::lock_guard lock(mMutex);
@@ -105,27 +110,27 @@ namespace tremotesf {
                 });
 
                 const auto dirPath = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
-                logDebug("FileLogger: creating logs directory {}", QDir::toNativeSeparators(dirPath));
+                debug().log("FileLogger: creating logs directory {}", QDir::toNativeSeparators(dirPath));
                 try {
                     fs::create_directories(fs::path(getCWString(dirPath)));
                 } catch (const fs::filesystem_error& e) {
-                    logWarningWithException(e, "FileLogger: failed to create logs directory");
+                    warning().logWithException(e, "FileLogger: failed to create logs directory");
                     return;
                 }
-                logDebug("FileLogger: created logs directory");
+                debug().log("FileLogger: created logs directory");
 
                 auto filePath = QString::fromStdString(
                     fmt::format("{}/{}.log", dirPath, QDateTime::currentDateTime().toString(u"yyyy-MM-dd_hh-mm-ss.zzz"))
                 );
-                logDebug("FileLogger: creating log file {}", QDir::toNativeSeparators(filePath));
+                debug().log("FileLogger: creating log file {}", QDir::toNativeSeparators(filePath));
                 QFile file(filePath);
                 try {
                     openFile(file, QIODevice::WriteOnly | QIODevice::NewOnly | QIODevice::Text | QIODevice::Unbuffered);
                 } catch (const QFileError& e) {
-                    logWarningWithException(e, "FileLogger: failed to create log file");
+                    warning().logWithException(e, "FileLogger: failed to create log file");
                     return;
                 }
-                logDebug("FileLogger: created log file");
+                debug().log("FileLogger: created log file");
 
                 {
                     const std::lock_guard lock(mMutex);
@@ -169,14 +174,14 @@ namespace tremotesf {
 
         std::unique_ptr<FileLogger> globalFileLogger{};
 
-        [[maybe_unused]] void releaseMessageHandler(QString&& message) {
+        [[maybe_unused]] void releaseMessageHandler(QString message) {
             writeToDebugger(getCWString(message));
             if (globalFileLogger) {
                 globalFileLogger->logMessage(std::move(message));
             }
         }
 
-        [[maybe_unused]] void debugMessageHandler(QString&& message) {
+        [[maybe_unused]] void debugMessageHandler(const QString& message) {
             const auto wstr = getCWString(message);
             writeToDebugger(wstr);
             static const auto stderrHandle = GetStdHandle(STD_ERROR_HANDLE);
@@ -195,13 +200,23 @@ namespace tremotesf {
             }
         }
 
-        void windowsMessageHandler(QtMsgType type, const QMessageLogContext& context, const QString& message) {
-            QString formatted = qFormatLogMessage(type, context, message);
+        void callReleaseOrDebugHandler(QtMsgType type, const QMessageLogContext& context, const QString& message) {
+            const QString formatted = qFormatLogMessage(type, context, message);
 #ifdef NDEBUG
-            releaseMessageHandler(std::move(formatted));
+            releaseMessageHandler(formatted);
 #else
-            debugMessageHandler(std::move(formatted));
+            debugMessageHandler(formatted);
 #endif
+        }
+
+        void windowsMessageHandler(QtMsgType type, const QMessageLogContext& context, const QString& message) {
+            if (type == QtFatalMsg) {
+                std::string report = makeFatalErrorReportFromLogMessage(message, context);
+                callReleaseOrDebugHandler(type, context, QString::fromStdString(report));
+                showFatalErrorReportInDialog(std::move(report));
+                std::abort();
+            }
+            callReleaseOrDebugHandler(type, context, message);
         }
     }
 
@@ -212,7 +227,7 @@ namespace tremotesf {
         );
 #ifdef NDEBUG
         globalFileLogger = std::make_unique<FileLogger>();
-        logDebug("FileLogger: created, starting write thread");
+        debug().log("FileLogger: created, starting write thread");
 #endif
     }
 

@@ -13,7 +13,6 @@
 #include <QIcon>
 #include <QItemSelectionModel>
 #include <QKeyEvent>
-#include <QLabel>
 #include <QMenu>
 #include <QMessageBox>
 #include <QPushButton>
@@ -21,6 +20,7 @@
 
 #include "rpc/torrent.h"
 #include "rpc/tracker.h"
+#include "stdutils.h"
 #include "ui/itemmodels/baseproxymodel.h"
 #include "ui/widgets/basetreeview.h"
 #include "ui/widgets/textinputdialog.h"
@@ -162,8 +162,10 @@ namespace tremotesf {
             this
         );
         QObject::connect(dialog, &TextInputDialog::accepted, this, [=, this] {
-            const auto lines = dialog->text().split('\n', Qt::SkipEmptyParts);
-            mTorrent->addTrackers(lines);
+            auto lines = dialog->text().split('\n', Qt::SkipEmptyParts);
+            mTorrent->addTrackers(toContainer<std::vector>(lines | std::views::transform([](QString& announceUrl) {
+                                                               return std::set{std::move(announceUrl)};
+                                                           })));
         });
         dialog->show();
     }

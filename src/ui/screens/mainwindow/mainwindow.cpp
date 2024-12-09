@@ -6,6 +6,7 @@
 #include "mainwindow.h"
 
 #include <algorithm>
+#include <array>
 #include <functional>
 #include <cmath>
 #include <unordered_map>
@@ -27,24 +28,19 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
-#include <QMimeData>
 #include <QPointer>
-#include <QProxyStyle>
 #include <QPushButton>
 #include <QShortcut>
 #include <QSplitter>
 #include <QStackedLayout>
 #include <QSystemTrayIcon>
-#include <QTimer>
 #include <QToolBar>
-#include <QWindow>
 
 #include <KMessageWidget>
 
 #ifdef TREMOTESF_UNIX_FREEDESKTOP
 #    include <KStartupInfo>
 #    include <KWindowSystem>
-#    include <kwindowsystem_version.h>
 #    include "unixhelpers.h"
 #endif
 
@@ -58,6 +54,7 @@
 #include "ui/stylehelpers.h"
 #include "ui/screens/aboutdialog.h"
 #include "ui/screens/addtorrent/addtorrentdialog.h"
+#include "ui/screens/addtorrent/addtorrenthelpers.h"
 #include "ui/screens/connectionsettings/servereditdialog.h"
 #include "ui/screens/connectionsettings/connectionsettingsdialog.h"
 #include "ui/screens/serversettings/serversettingsdialog.h"
@@ -81,7 +78,6 @@
 #include "torrentsview.h"
 
 SPECIALIZE_FORMATTER_FOR_QDEBUG(QRect)
-SPECIALIZE_FORMATTER_FOR_Q_ENUM(Qt::ApplicationState)
 
 namespace tremotesf {
     namespace {
@@ -149,26 +145,90 @@ namespace tremotesf {
             QCheckBox* const mMoveFilesCheckBox;
         };
 
-        constexpr auto kdePlatformFileDialogClassName = "KDEPlatformFileDialog";
+#ifndef Q_OS_MACOS
+        bool isAllowedToHide(const QWidget* window) {
+            static constexpr std::array classNames{// Managed by QFileDialog
+                                                   "KDEPlatformFileDialog"_l1,
+                                                   "KDirSelectDialog"_l1,
+                                                   // Managed by QSystemTrayIcon
+                                                   "QSystemTrayIconSys"_l1
+            };
+            auto* const metaObject = window->metaObject();
+            return metaObject &&
+                   std::ranges::find(classNames, QLatin1String(metaObject->className())) == classNames.end();
+        }
 
         [[nodiscard]] std::vector<QPointer<QWidget>> toQPointers(const QWidgetList& widgets) {
             return {widgets.begin(), widgets.end()};
         }
+#endif
 
-        void showAndRaiseWindow(QWidget* window) {
-            logInfo(
-                "Showing {}, it is hidden = {}, minimized = {}",
-                *window,
-                window->isHidden(),
-                window->isMinimized()
-            );
-            if (window->isHidden()) {
-                window->show();
-            }
+        void unminimizeAndRaiseWindow(QWidget* window) {
             if (window->isMinimized()) {
+                info().log("Unminimizing window {}", *window);
                 window->setWindowState(window->windowState().setFlag(Qt::WindowMinimized, false));
             }
+            info().log("Raising window {}", *window);
             window->raise();
+        }
+
+#ifdef TREMOTESF_UNIX_FREEDESKTOP
+        void activeWindowOnX11(QWidget* window, const std::optional<QByteArray>& startupNotificationId) {
+            if (startupNotificationId.has_value()) {
+                info().log("Removing startup notification with id {}", *startupNotificationId);
+                KStartupInfo::setNewStartupId(window->windowHandle(), *startupNotificationId);
+                KStartupInfo::appStarted(*startupNotificationId);
+            }
+            window->activateWindow();
+        }
+
+        void activeWindowOnWayland(
+            [[maybe_unused]] QWidget* window, [[maybe_unused]] const std::optional<QByteArray>& xdgActivationToken
+        ) {
+#    if QT_VERSION_MAJOR >= 6
+            if (xdgActivationToken.has_value()) {
+                info().log("Activating window with token {}", *xdgActivationToken);
+                // Qt gets new token from XDG_ACTIVATION_TOKEN environment variable
+                // It we be read and unset in QWidget::activateWindow() call below
+                qputenv(xdgActivationTokenEnvVariable, *xdgActivationToken);
+            }
+            window->activateWindow();
+#    else
+            if (xdgActivationToken.has_value()) {
+                info().log("Activating window with token {}", *xdgActivationToken);
+                KWindowSystem::setCurrentXdgActivationToken(*xdgActivationToken);
+            }
+            if (const auto handle = window->windowHandle(); handle) {
+                KWindowSystem::activateWindow(handle);
+            } else {
+                warning().log("This window's QWidget::windowHandle() is null");
+            }
+#    endif
+        }
+#endif
+
+        void activateWindowCompat(
+            QWidget* window, [[maybe_unused]] const std::optional<QByteArray>& windowActivationToken = {}
+        ) {
+            info().log("Activating window {}", *window);
+#ifdef TREMOTESF_UNIX_FREEDESKTOP
+            switch (KWindowSystem::platform()) {
+            case KWindowSystem::Platform::X11:
+                debug().log("Windowing system is X11");
+                activeWindowOnX11(window, windowActivationToken);
+                break;
+            case KWindowSystem::Platform::Wayland:
+                debug().log("Windowing system is Wayland");
+                activeWindowOnWayland(window, windowActivationToken);
+                break;
+            default:
+                warning().log("Unknown windowing system");
+                window->activateWindow();
+                break;
+            }
+#else
+            window->activateWindow();
+#endif
         }
     }
 
@@ -189,10 +249,9 @@ namespace tremotesf {
             auto mainWidgetLayout = new QVBoxLayout(mainWidgetContainer);
             mainWidgetLayout->setContentsMargins(0, 0, 0, 0);
 
-            auto messageWidget = new KMessageWidget(mWindow);
-            messageWidget->setWordWrap(true);
-            messageWidget->hide();
-            mainWidgetLayout->addWidget(messageWidget);
+            mDelayedTorrentAddMessage.setWordWrap(true);
+            mDelayedTorrentAddMessage.hide();
+            mainWidgetLayout->addWidget(&mDelayedTorrentAddMessage);
 
             auto torrentsViewContainer = new QWidget(mWindow);
             mainWidgetLayout->addWidget(torrentsViewContainer);
@@ -262,9 +321,31 @@ namespace tremotesf {
                 &mViewModel,
                 &MainWindowViewModel::showWindow,
                 this,
-                &MainWindow::Impl::showWindowsAndActivateMainOrDialog
+                &MainWindow::Impl::showWindowsOrActivateMainWindow
             );
-            showAddTorrentDialogsFromIpc(messageWidget);
+            QObject::connect(
+                &mViewModel,
+                &MainWindowViewModel::showAddTorrentDialogs,
+                this,
+                &MainWindow::Impl::showAddTorrentDialogs
+            );
+            QObject::connect(
+                &mViewModel,
+                &MainWindowViewModel::askForMergingTrackers,
+                this,
+                &MainWindow::Impl::askForMergingTrackers
+            );
+            QObject::connect(
+                &mViewModel,
+                &MainWindowViewModel::showDelayedTorrentAddMessage,
+                this,
+                &MainWindow::Impl::showDelayedTorrentAddMessage
+            );
+            QObject::connect(&mViewModel, &MainWindowViewModel::hideDelayedTorrentAddMessage, this, [this] {
+                if (mDelayedTorrentAddMessage.isVisible()) {
+                    mDelayedTorrentAddMessage.animatedHide();
+                }
+            });
             showAddTorrentErrors();
 
             auto pasteShortcut = new QShortcut(QKeySequence::Paste, mWindow);
@@ -293,32 +374,7 @@ namespace tremotesf {
             });
 
             if constexpr (targetOs == TargetOs::UnixMacOS) {
-                QObject::connect(
-                    qApp,
-                    &QGuiApplication::applicationStateChanged,
-                    this,
-                    [this](Qt::ApplicationState state) {
-                        logDebug("Application state is {}", state);
-                        if (state == Qt::ApplicationActive) {
-                            // When window is hidden and application is activated by the system (e.g. by click on its icon in Dock),
-                            // applicationStateChanged signal is emitted with ApplicationActive
-                            // We need to show our window manually in this case
-                            if (mWindow->isHidden()) {
-                                logInfo("Application is activated by the system, showing windows");
-                                showWindowsAndActivateMainOrDialog();
-                            }
-                        } else {
-                            // On macOS application can be hidden without mWindow becoming hidden
-                            // In this case applicationStateChanged is emitted with ApplicationInactive
-                            // while isNSAppHidden returns true,
-                            // and need to update show/hide tray icon action
-                            if (isNSAppHidden() && !mWindow->isHidden()) {
-                                logInfo("Application is hidden by the system, hiding windows");
-                                hideWindows();
-                            }
-                        }
-                    }
-                );
+                QObject::connect(qApp, &QGuiApplication::applicationStateChanged, this, &MainWindow::Impl::updateShowHideAction);
             }
 
             // restoreGeometry() may call MainWindow::event() but we are still in MainWindow constructor
@@ -339,10 +395,10 @@ namespace tremotesf {
 
         void updateShowHideAction() {
             QObject::disconnect(&mShowHideAppAction, &QAction::triggered, nullptr, nullptr);
-            if (shouldShowWindows()) {
+            if (isMainWindowHiddenOrMinimized()) {
                 mShowHideAppAction.setText(qApp->translate("tremotesf", "&Show Tremotesf"));
                 QObject::connect(&mShowHideAppAction, &QAction::triggered, this, [this] {
-                    showWindowsAndActivateMainOrDialog();
+                    showWindowsOrActivateMainWindow();
                 });
             } else {
                 mShowHideAppAction.setText(qApp->translate("tremotesf", "&Hide Tremotesf"));
@@ -356,17 +412,17 @@ namespace tremotesf {
         bool onCloseEvent() {
 #if QT_VERSION_MAJOR >= 6
             if (mAppQuitEventFilter.isQuittingApplication) {
-                logDebug("Received close event on main window while quitting app, just close window");
+                debug().log("Received close event on main window while quitting app, just close window");
                 return false;
             }
 #endif
             // Do stuff at the next event loop iteration since we are in the middle of event handling
             if (mTrayIcon.isVisible() && QSystemTrayIcon::isSystemTrayAvailable()) {
-                logInfo("Closed main window but tray icon is active, hide windows without quitting app");
+                info().log("Closed main window but tray icon is active, hide windows without quitting app");
                 QMetaObject::invokeMethod(this, &MainWindow::Impl::hideWindows, Qt::QueuedConnection);
                 return true;
             }
-            logInfo("Closed main window when tray icon is not active, quitting app");
+            info().log("Closed main window when tray icon is not active, quitting app");
             QMetaObject::invokeMethod(qApp, &QCoreApplication::quit, Qt::QueuedConnection);
             return false;
         }
@@ -376,7 +432,7 @@ namespace tremotesf {
         void onDropEvent(QDropEvent* event) { mViewModel.processDropEvent(event); }
 
         void saveState() {
-            logDebug("Saving MainWindow state, window geometry is {}", mWindow->geometry());
+            debug().log("Saving MainWindow state, window geometry is {}", mWindow->geometry());
             Settings::instance()->setMainWindowGeometry(mWindow->saveGeometry());
             Settings::instance()->setMainWindowState(mWindow->saveState());
             Settings::instance()->setSplitterState(mSplitter.saveState());
@@ -396,6 +452,8 @@ namespace tremotesf {
         MainWindowViewModel mViewModel;
 
         QSplitter mSplitter{};
+
+        KMessageWidget mDelayedTorrentAddMessage{};
 
         TorrentsModel mTorrentsModel{mViewModel.rpc()};
         TorrentsProxyModel mTorrentsProxyModel{&mTorrentsModel};
@@ -444,6 +502,10 @@ namespace tremotesf {
 
         QSystemTrayIcon mTrayIcon{QIcon::fromTheme("tremotesf-tray-icon"_l1, mWindow->windowIcon())};
 
+#ifndef Q_OS_MACOS
+        std::vector<QPointer<QWidget>> mOtherWindowsHiddenByUs;
+#endif
+
         SaveWindowStateHandler mSaveStateHandler{mWindow, [this] { saveState(); }};
 #if QT_VERSION_MAJOR >= 6
         ApplicationQuitEventFilter mAppQuitEventFilter{};
@@ -467,10 +529,10 @@ namespace tremotesf {
             mConnectionDependentActions.push_back(&mAddTorrentFileAction);
 
             QObject::connect(&mAddTorrentLinkAction, &QAction::triggered, this, [this] {
-                if (Settings::instance()->showMainWindowWhenAddingTorrent() && shouldShowWindows()) {
-                    showWindowsAndActivateMainOrDialog();
+                if (Settings::instance()->showMainWindowWhenAddingTorrent() && isMainWindowHiddenOrMinimized()) {
+                    showWindowsOrActivateMainWindow();
                 }
-                showAddTorrentLinkDialog();
+                mViewModel.triggeredAddTorrentLinkAction();
             });
             mConnectionDependentActions.push_back(&mAddTorrentLinkAction);
 
@@ -793,8 +855,8 @@ namespace tremotesf {
 
         void openTorrentFiles() {
             auto* const settings = Settings::instance();
-            if (settings->showMainWindowWhenAddingTorrent() && shouldShowWindows()) {
-                showWindowsAndActivateMainOrDialog();
+            if (settings->showMainWindowWhenAddingTorrent() && isMainWindowHiddenOrMinimized()) {
+                showWindowsOrActivateMainWindow();
             }
             auto directory = settings->rememberOpenTorrentDir() ? settings->lastOpenTorrentDirectory() : QString{};
             if (directory.isEmpty()) {
@@ -812,7 +874,7 @@ namespace tremotesf {
             fileDialog->setFileMode(QFileDialog::ExistingFiles);
 
             QObject::connect(fileDialog, &QFileDialog::accepted, this, [fileDialog, this] {
-                addTorrentFiles(fileDialog->selectedFiles());
+                mViewModel.acceptedFileDialog(fileDialog->selectedFiles());
             });
 
             if constexpr (targetOs == TargetOs::Windows) {
@@ -820,66 +882,6 @@ namespace tremotesf {
             } else {
                 fileDialog->show();
             }
-        }
-
-        void addTorrentFiles(
-            const QStringList& files, bool activateWindows = false, std::optional<QByteArray> windowActivationToken = {}
-        ) {
-            auto* const settings = Settings::instance();
-            if (settings->showAddTorrentDialog()) {
-                const bool setParent = settings->showMainWindowWhenAddingTorrent();
-                for (const QString& filePath : files) {
-                    auto* const dialog = showAddTorrentFileDialog(filePath, setParent);
-                    if (activateWindows) {
-                        activateWindow(dialog, windowActivationToken);
-                        // Can use token only once
-                        windowActivationToken.reset();
-                    }
-                }
-            } else {
-                mViewModel.addTorrentFilesWithoutDialog(files);
-            }
-        }
-
-        QDialog* showAddTorrentFileDialog(const QString& filePath, bool setParent) {
-            auto* const dialog = new AddTorrentDialog(
-                mViewModel.rpc(),
-                filePath,
-                AddTorrentDialog::Mode::File,
-                setParent ? mWindow : nullptr
-            );
-            dialog->setAttribute(Qt::WA_DeleteOnClose);
-            dialog->show();
-            return dialog;
-        }
-
-        void addTorrentLinks(
-            const QStringList& urls, bool activateWindows = false, std::optional<QByteArray> windowActivationToken = {}
-        ) {
-            auto* const settings = Settings::instance();
-            if (settings->showAddTorrentDialog()) {
-                const bool setParent = settings->showMainWindowWhenAddingTorrent();
-                for (const QString& url : urls) {
-                    auto* const dialog = showAddTorrentLinkDialog(url, setParent);
-                    if (activateWindows) {
-                        activateWindow(dialog, windowActivationToken);
-                        // Can use token only once
-                        windowActivationToken.reset();
-                    }
-                }
-            } else {
-                mViewModel.addTorrentLinksWithoutDialog(urls);
-            }
-        }
-
-        QDialog* showAddTorrentLinkDialog(
-            const QString& url = {}, bool setParent = Settings::instance()->showMainWindowWhenAddingTorrent()
-        ) {
-            auto* const dialog =
-                new AddTorrentDialog(mViewModel.rpc(), url, AddTorrentDialog::Mode::Url, setParent ? mWindow : nullptr);
-            dialog->setAttribute(Qt::WA_DeleteOnClose);
-            dialog->show();
-            return dialog;
         }
 
         void updateTorrentActions() {
@@ -961,8 +963,8 @@ namespace tremotesf {
                 const auto hashString = torrent->data().hashString;
                 const auto existingDialog = mTorrentsDialogs.find(hashString);
                 if (existingDialog != mTorrentsDialogs.end()) {
-                    showAndRaiseWindow(existingDialog->second);
-                    activateWindow(existingDialog->second);
+                    unminimizeAndRaiseWindow(existingDialog->second);
+                    activateWindowCompat(existingDialog->second);
                 } else {
                     auto dialog = new TorrentPropertiesDialog(torrent, mViewModel.rpc(), mWindow);
                     dialog->setAttribute(Qt::WA_DeleteOnClose);
@@ -1136,8 +1138,8 @@ namespace tremotesf {
         void showSingleInstanceDialog(CreateDialogFunction createDialog) {
             auto existingDialog = mWindow->findChild<Dialog*>({}, Qt::FindDirectChildrenOnly);
             if (existingDialog) {
-                showAndRaiseWindow(existingDialog);
-                activateWindow(existingDialog);
+                unminimizeAndRaiseWindow(existingDialog);
+                activateWindowCompat(existingDialog);
             } else {
                 auto dialog = createDialog();
                 dialog->setAttribute(Qt::WA_DeleteOnClose);
@@ -1375,8 +1377,8 @@ namespace tremotesf {
             if constexpr (targetOs != TargetOs::UnixMacOS) {
                 QObject::connect(&mTrayIcon, &QSystemTrayIcon::activated, this, [this](auto reason) {
                     if (reason == QSystemTrayIcon::Trigger || reason == QSystemTrayIcon::DoubleClick) {
-                        if (shouldShowWindows()) {
-                            showWindowsAndActivateMainOrDialog();
+                        if (isMainWindowHiddenOrMinimized()) {
+                            showWindowsOrActivateMainWindow();
                         } else {
                             hideWindows();
                         }
@@ -1418,125 +1420,95 @@ namespace tremotesf {
                     mTrayIcon.show();
                 } else {
                     mTrayIcon.hide();
-                    showWindowsAndActivateMainOrDialog();
+                    showWindowsOrActivateMainWindow();
                 }
             });
         }
 
-        bool shouldShowWindows() const { return mWindow->isHidden() || mWindow->isMinimized(); }
-
-        void showWindowsAndActivateMainOrDialog(
-            [[maybe_unused]] const std::optional<QByteArray>& windowActivationToken = {}
-        ) {
-            logInfo("Showing windows");
+        bool isMainWindowHiddenOrMinimized() const {
             if constexpr (targetOs == TargetOs::UnixMacOS) {
-                if (isNSAppHidden()) {
-                    logInfo("NSApp is hidden, unhiding it");
-                    unhideNSApp();
-                } else {
-                    logDebug("NSApp is not hidden");
-                }
+                if (isNSAppHidden()) return true;
             }
-            showAndRaiseWindow(mWindow);
-            QWidget* lastDialog = nullptr;
-            // Hiding/showing widgets while we are iterating over topLevelWidgets() is not safe, so wrap them in QPointers
-            // so that we don't operate on deleted QWidgets
-            for (const auto& widget : toQPointers(qApp->topLevelWidgets())) {
-                if (widget && widget->windowType() == Qt::Dialog && !widget->inherits(kdePlatformFileDialogClassName)) {
-                    showAndRaiseWindow(widget);
-                    lastDialog = widget;
-                }
-            }
-            QWidget* dialogToActivate = qApp->activeModalWidget();
-            if (!dialogToActivate) {
-                dialogToActivate = lastDialog;
-            }
-            activateWindow(mWindow, windowActivationToken);
-            if (dialogToActivate) {
-                activateWindow(dialogToActivate);
-            }
+            return mWindow->isHidden() || mWindow->isMinimized();
         }
 
-        void activateWindow(
-            QWidget* widgetToActivate, [[maybe_unused]] const std::optional<QByteArray>& windowActivationToken = {}
-        ) {
-            logInfo("Activating window {}", *widgetToActivate);
-#ifdef TREMOTESF_UNIX_FREEDESKTOP
-            switch (KWindowSystem::platform()) {
-            case KWindowSystem::Platform::X11:
-                logDebug("Windowing system is X11");
-                activeWindowOnX11(widgetToActivate, windowActivationToken);
-                break;
-            case KWindowSystem::Platform::Wayland:
-                logDebug("Windowing system is Wayland");
-                activeWindowOnWayland(widgetToActivate, windowActivationToken);
-                break;
-            default:
-                logWarning("Unknown windowing system");
-                widgetToActivate->activateWindow();
-                break;
+        void showWindowsOrActivateMainWindow([[maybe_unused]] std::optional<QByteArray> windowActivationToken = {}) {
+            info().log("Showing windows");
+#ifdef Q_OS_MACOS
+            if (isNSAppHidden()) {
+                info().log("NSApp is hidden, unhiding it");
+                unhideNSApp();
+            } else {
+                info().log("NSApp is not hidden, activating main window");
+                unminimizeAndRaiseWindow(mWindow);
+                activateWindowCompat(mWindow);
             }
 #else
-            widgetToActivate->activateWindow();
-#endif
-        }
-
-#ifdef TREMOTESF_UNIX_FREEDESKTOP
-        void activeWindowOnX11(QWidget* widgetToActivate, const std::optional<QByteArray>& startupNotificationId) {
-            if (startupNotificationId.has_value()) {
-                logInfo("Removing startup notification with id {}", *startupNotificationId);
-                KStartupInfo::setNewStartupId(widgetToActivate->windowHandle(), *startupNotificationId);
-                KStartupInfo::appStarted(*startupNotificationId);
+            if (!mWindow->isHidden()) {
+                info().log("Main window is not hidden, activating it");
+                unminimizeAndRaiseWindow(mWindow);
+                activateWindowCompat(mWindow, windowActivationToken);
+                return;
             }
-            widgetToActivate->activateWindow();
-        }
 
-        void activeWindowOnWayland(
-            [[maybe_unused]] QWidget* widgetToActivate,
-            [[maybe_unused]] const std::optional<QByteArray>& xdgActivationToken
-        ) {
-#    if QT_VERSION_MAJOR >= 6
-            if (xdgActivationToken.has_value()) {
-                logInfo("Activating window with token {}", *xdgActivationToken);
+#    if defined(TREMOTESF_UNIX_FREEDESKTOP) && QT_VERSION_MAJOR >= 6
+            // With Qt 6 and Wayland we need to set XDG_ACTIVATION_TOKEN environment variable before show()
+            // so that Qt handles activation automatically
+            if (windowActivationToken.has_value() && KWindowSystem::isPlatformWayland()) {
+                info().log("Showing window with token {}", *windowActivationToken);
                 // Qt gets new token from XDG_ACTIVATION_TOKEN environment variable
-                // It we be read and unset in QWidget::activateWindow() call below
-                qputenv(xdgActivationTokenEnvVariable, *xdgActivationToken);
+                // It we be read and unset in QWidget::show() call below
+                qputenv(xdgActivationTokenEnvVariable, *windowActivationToken);
+                windowActivationToken.reset();
             }
-            widgetToActivate->activateWindow();
-#    elif KWINDOWSYSTEM_VERSION >= QT_VERSION_CHECK(5, 89, 0)
-            if (xdgActivationToken.has_value()) {
-                logInfo("Activating window with token {}", *xdgActivationToken);
-                KWindowSystem::setCurrentXdgActivationToken(*xdgActivationToken);
-            }
-            if (const auto handle = widgetToActivate->windowHandle(); handle) {
-                KWindowSystem::activateWindow(handle);
-            } else {
-                logWarning("This window's QWidget::windowHandle() is null");
-            }
-#    else
-#        warning "Window activation on Wayland is not supported because KWindowSystem version is too low"
-            logWarning("Window activation on Wayland is not supported because KWindowSystem version is too low");
 #    endif
-        }
-#endif
-
-        void hideWindows() {
-            logInfo("Hiding windows");
-            // Hiding/showing widgets while we are iterating over topLevelWidgets() is not safe, so wrap them in QPointers
-            // so that we don't operate on deleted QWidgets
-            for (const auto& widget : toQPointers(qApp->topLevelWidgets())) {
-                if (widget && widget->windowType() == Qt::Dialog && !widget->inherits(kdePlatformFileDialogClassName)) {
-                    logDebug("Hiding {}", *widget);
-                    widget->hide();
+            info().log("Showing window {}", *mWindow);
+            mWindow->show();
+            unminimizeAndRaiseWindow(mWindow);
+            if (windowActivationToken.has_value()) {
+                activateWindowCompat(mWindow, windowActivationToken);
+            }
+            for (const auto& window : mOtherWindowsHiddenByUs) {
+                if (window) {
+                    info().log("Showing window {}", *window);
+                    window->show();
+                    unminimizeAndRaiseWindow(window);
                 }
             }
-            logDebug("Hiding {}", *mWindow);
-            mWindow->hide();
-            if constexpr (targetOs == TargetOs::UnixMacOS) {
-                // We need this so that system menu bar switches to previous app
-                logDebug("Hiding NSApp");
-                hideNSApp();
+            mOtherWindowsHiddenByUs.clear();
+#endif
+        }
+
+        void hideWindows() {
+            info().log("Hiding windows");
+#ifdef Q_OS_MACOS
+            if (isNSAppHidden()) {
+                info().log("NSApp is already hidden, do nothing");
+                return;
             }
+            // Hiding application doesn't work in fullscreen mode
+            if (mWindow->isFullScreen()) {
+                info().log("Exiting fullscreen");
+                mWindow->setWindowState(mWindow->windowState().setFlag(Qt::WindowFullScreen, false));
+            }
+            info().log("Hiding NSApp");
+            hideNSApp();
+#else
+            if (mWindow->isHidden()) {
+                info().log("Main window is already hidden, do nothing");
+                return;
+            }
+            info().log("Hiding {}", *mWindow);
+            mWindow->hide();
+            mOtherWindowsHiddenByUs.clear();
+            for (auto&& widget : toQPointers(qApp->topLevelWidgets())) {
+                if (widget != mWindow && widget->isWindow() && !widget->isHidden() && isAllowedToHide(widget)) {
+                    info().log("Hiding {}", *widget);
+                    widget->hide();
+                    mOtherWindowsHiddenByUs.push_back(std::move(widget));
+                }
+            }
+#endif
         }
 
         void openTorrentsFiles() {
@@ -1563,59 +1535,82 @@ namespace tremotesf {
             launchFileManagerAndSelectFiles(files, mWindow);
         }
 
-        void showAddTorrentDialogsFromIpc(KMessageWidget* messageWidget) {
-            QObject::connect(
-                &mViewModel,
-                &MainWindowViewModel::showAddTorrentDialogs,
-                this,
-                [messageWidget, this](
-                    const QStringList& files,
-                    const QStringList& urls,
-                    std::optional<QByteArray> windowActivationToken
-                ) {
-                    if (messageWidget->isVisible()) {
-                        messageWidget->animatedHide();
-                    }
-                    if (Settings::instance()->showMainWindowWhenAddingTorrent() &&
-                        (shouldShowWindows() || windowActivationToken.has_value())) {
-                        showWindowsAndActivateMainOrDialog(windowActivationToken);
-                        windowActivationToken.reset();
-                    }
-                    if (!files.isEmpty()) {
-                        addTorrentFiles(files, true, windowActivationToken);
-                        windowActivationToken.reset();
-                    }
-                    if (!urls.isEmpty()) {
-                        addTorrentLinks(urls, true, windowActivationToken);
-                    }
-                }
-            );
+        void showAddTorrentDialogs(
+            const QStringList& files, const QStringList& urls, std::optional<QByteArray> windowActivationToken
+        ) {
+            if (!files.isEmpty()) {
+                showAddTorrentFileDialogs(files, std::move(windowActivationToken));
+                // NOLINTNEXTLINE(bugprone-use-after-move)
+                windowActivationToken.reset();
+            }
+            if (!urls.isEmpty()) {
+                showAddTorrentLinksDialog(urls, std::move(windowActivationToken));
+            }
+        }
 
-            QObject::connect(
-                &mViewModel,
-                &MainWindowViewModel::showDelayedTorrentAddMessage,
-                this,
-                [messageWidget](const QStringList& torrents) {
-                    logDebug("MainWindow: showing delayed torrent add message");
-                    messageWidget->setMessageType(KMessageWidget::Information);
-                    //: Message shown when user attempts to add torrent while disconnect from server. After that will be list of added torrents
-                    QString text = qApp->translate("tremotesf", "Torrents will be added after connection to server:");
-                    constexpr QStringList::size_type maxCount = 5;
-                    const auto count = std::min(torrents.size(), maxCount);
-                    const auto subList = torrents.mid(0, count);
-                    for (const auto& torrent : subList) {
-                        text += "\n \u2022 ";
-                        text += torrent;
-                    }
-                    if (auto remaining = torrents.size() - count; remaining > 0) {
-                        text += "\n \u2022 ";
-                        //: Shown when list of items exceeds maximum size. %n is a number of remaining items
-                        text += qApp->translate("tremotesf", "And %n more", nullptr, static_cast<int>(remaining));
-                    }
-                    messageWidget->setText(text);
-                    messageWidget->animatedShow();
+        void showAddTorrentFileDialogs(const QStringList& files, std::optional<QByteArray> windowActivationToken) {
+            const bool setParent = Settings::instance()->showMainWindowWhenAddingTorrent();
+            for (const QString& filePath : files) {
+                auto* const dialog = showAddTorrentFileDialog(filePath, setParent);
+                if (windowActivationToken.has_value()) {
+                    activateWindowCompat(dialog, windowActivationToken);
+                    // Can use token only once
+                    windowActivationToken.reset();
                 }
+            }
+        }
+
+        QDialog* showAddTorrentFileDialog(const QString& filePath, bool setParent) {
+            auto* const dialog = new AddTorrentDialog(
+                mViewModel.rpc(),
+                AddTorrentDialog::FileParams{filePath},
+                setParent ? mWindow : nullptr
             );
+            dialog->setAttribute(Qt::WA_DeleteOnClose);
+            dialog->show();
+            return dialog;
+        }
+
+        void showAddTorrentLinksDialog(const QStringList& urls, std::optional<QByteArray> windowActivationToken) {
+            auto* const dialog = new AddTorrentDialog(
+                mViewModel.rpc(),
+                AddTorrentDialog::UrlParams{urls},
+                Settings::instance()->showMainWindowWhenAddingTorrent() ? mWindow : nullptr
+            );
+            dialog->setAttribute(Qt::WA_DeleteOnClose);
+            dialog->show();
+            if (windowActivationToken.has_value()) {
+                activateWindowCompat(dialog, windowActivationToken);
+                // Can use token only once
+                windowActivationToken.reset();
+            }
+        }
+
+        QDialog* showAddTorrentLinksDialog(const QStringList& urls, bool setParent) {
+            auto* const dialog = new AddTorrentDialog(
+                mViewModel.rpc(),
+                AddTorrentDialog::UrlParams{urls},
+                setParent ? mWindow : nullptr
+            );
+            dialog->setAttribute(Qt::WA_DeleteOnClose);
+            dialog->show();
+            return dialog;
+        }
+
+        void askForMergingTrackers(
+            std::vector<std::pair<Torrent*, std::vector<std::set<QString>>>> existingTorrents,
+            std::optional<QByteArray> windowActivationToken
+        ) {
+            const bool setParent = Settings::instance()->showMainWindowWhenAddingTorrent();
+            for (auto& [torrent, trackers] : existingTorrents) {
+                auto* const dialog =
+                    tremotesf::askForMergingTrackers(torrent, std::move(trackers), setParent ? mWindow : nullptr);
+                if (windowActivationToken.has_value()) {
+                    activateWindowCompat(dialog, windowActivationToken);
+                    // Can use token only once
+                    windowActivationToken.reset();
+                }
+            }
         }
 
         void showAddTorrentErrors() {
@@ -1623,13 +1618,13 @@ namespace tremotesf {
                 QWidget* parent{};
                 if (Settings::instance()->showMainWindowWhenAddingTorrent()) {
                     parent = mWindow;
-                    showWindowsAndActivateMainOrDialog();
+                    showWindowsOrActivateMainWindow();
                 }
                 auto* const dialog = new QMessageBox(QMessageBox::Warning, title, text, QMessageBox::Close, parent);
                 dialog->setAttribute(Qt::WA_DeleteOnClose, true);
                 dialog->setModal(false);
                 dialog->show();
-                activateWindow(dialog);
+                activateWindowCompat(dialog);
             };
 
             QObject::connect(mViewModel.rpc(), &Rpc::torrentAddDuplicate, this, [=] {
@@ -1639,12 +1634,33 @@ namespace tremotesf {
                 );
             });
 
-            QObject::connect(mViewModel.rpc(), &Rpc::torrentAddError, this, [=] {
+            QObject::connect(mViewModel.rpc(), &Rpc::torrentAddError, this, [=](const QString& filePathOrUrl) {
                 showError(
                     qApp->translate("tremotesf", "Error adding torrent"),
-                    qApp->translate("tremotesf", "Error adding torrent")
+                    qApp->translate("tremotesf", "Error adding torrent «%1»").arg(filePathOrUrl)
                 );
             });
+        }
+
+        void showDelayedTorrentAddMessage(const QStringList& torrents) {
+            debug().log("MainWindow: showing delayed torrent add message");
+            mDelayedTorrentAddMessage.setMessageType(KMessageWidget::Information);
+            //: Message shown when user attempts to add torrent while disconnect from server. After that will be list of added torrents
+            QString text = qApp->translate("tremotesf", "Torrents will be added after connection to server:");
+            constexpr QStringList::size_type maxCount = 5;
+            const auto count = std::min(torrents.size(), maxCount);
+            const auto subList = torrents.mid(0, count);
+            for (const auto& torrent : subList) {
+                text += "\n \u2022 ";
+                text += torrent;
+            }
+            if (auto remaining = torrents.size() - count; remaining > 0) {
+                text += "\n \u2022 ";
+                //: Shown when list of items exceeds maximum size. %n is a number of remaining items
+                text += qApp->translate("tremotesf", "And %n more", nullptr, static_cast<int>(remaining));
+            }
+            mDelayedTorrentAddMessage.setText(text);
+            mDelayedTorrentAddMessage.animatedShow();
         }
     };
 

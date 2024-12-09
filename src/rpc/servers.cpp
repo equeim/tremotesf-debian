@@ -9,9 +9,9 @@
 #include <QStringBuilder>
 
 #include "rpc/pathutils.h"
+#include "rpc/serversettings.h"
 #include "stdutils.h"
 #include "target_os.h"
-#include "torrent.h"
 
 namespace tremotesf {
     namespace {
@@ -66,6 +66,7 @@ namespace tremotesf {
         constexpr auto proxyTypeDefault = "Default"_l1;
         constexpr auto proxyTypeHttp = "HTTP"_l1;
         constexpr auto proxyTypeSocks5 = "SOCKS5"_l1;
+        constexpr auto proxyTypeNone = "None"_l1;
 
         ConnectionConfiguration::ProxyType proxyTypeFromSettings(const QString& value) {
             if (value.isEmpty() || value == proxyTypeDefault) {
@@ -76,6 +77,9 @@ namespace tremotesf {
             }
             if (value == proxyTypeSocks5) {
                 return ConnectionConfiguration::ProxyType::Socks5;
+            }
+            if (value == proxyTypeNone) {
+                return ConnectionConfiguration::ProxyType::None;
             }
             return ConnectionConfiguration::ProxyType::Default;
         }
@@ -88,6 +92,8 @@ namespace tremotesf {
                 return proxyTypeHttp;
             case ConnectionConfiguration::ProxyType::Socks5:
                 return proxyTypeSocks5;
+            case ConnectionConfiguration::ProxyType::None:
+                return proxyTypeNone;
             }
             return proxyTypeDefault;
         }
@@ -102,7 +108,7 @@ namespace tremotesf {
                 return true;
             }
             // Path ends with segment that's not actually the last segment of parentDirectory, just prefixed by it
-            if (path[directory.size()] != '/') {
+            if (!directory.endsWith('/') && path[directory.size()] != '/') {
                 return false;
             }
             return true;
@@ -128,32 +134,38 @@ namespace tremotesf {
     }
 
     QVariant LastTorrents::toVariant() const {
-        return createTransforming<QVariantList>(torrents, [](const LastTorrents::Torrent& torrent) {
-            return QVariantMap{
-                {lastTorrentsHashStringKey, torrent.hashString},
-                {lastTorrentsFinishedKey, torrent.finished}
-            };
-        });
+        return toContainer<QVariantList>(torrents | std::views::transform([](const LastTorrents::Torrent& torrent) {
+                                             return QVariant(QVariantMap{
+                                                 {lastTorrentsHashStringKey, torrent.hashString},
+                                                 {lastTorrentsFinishedKey, torrent.finished}
+                                             });
+                                         }));
     }
 
     LastTorrents LastTorrents::fromVariant(const QVariant& var) {
-        LastTorrents lastTorrents{};
-        if (var.isValid() && var.type() == QVariant::List) {
-            lastTorrents.saved = true;
-            lastTorrents.torrents =
-                createTransforming<std::vector<LastTorrents::Torrent>>(var.toList(), [](const QVariant& torrentVar) {
-                    const QVariantMap map = torrentVar.toMap();
-                    return LastTorrents::Torrent{
-                        map[lastTorrentsHashStringKey].toString(),
-                        map[lastTorrentsFinishedKey].toBool()
-                    };
-                });
+        if (!var.isValid() ||
+#if QT_VERSION_MAJOR >= 6
+            var.typeId() != QMetaType::QVariantList
+#else
+            var.type() != QVariant::List
+#endif
+        ) {
+            return {};
         }
-        return lastTorrents;
+        return {
+            .saved = true,
+            .torrents = toContainer<std::vector>(var.toList() | std::views::transform([](const QVariant& torrentVar) {
+                                                     const QVariantMap map = torrentVar.toMap();
+                                                     return LastTorrents::Torrent{
+                                                         .hashString = map[lastTorrentsHashStringKey].toString(),
+                                                         .finished = map[lastTorrentsFinishedKey].toBool()
+                                                     };
+                                                 }))
+        };
     }
 
     Servers* Servers::instance() {
-        static auto* const instance = new Servers(qApp);
+        static auto* const instance = new Servers(nullptr, qApp);
         return instance;
     }
 
@@ -190,24 +202,45 @@ namespace tremotesf {
 
     bool Servers::currentServerHasMountedDirectories() const { return !mCurrentServerMountedDirectories.empty(); }
 
-    QString Servers::fromLocalToRemoteDirectory(const QString& localPath, const ServerSettings* serverSettings) {
+    QString Servers::fromLocalToRemoteDirectory(const QString& localPath, PathOs remotePathOs) {
+        const auto localPathNormalized = normalizePath(localPath, localPathOs);
         for (const auto& [localDirectory, remoteDirectory] : mCurrentServerMountedDirectories) {
-            if (isPathUnderThisDirectory(localPath, localDirectory)) {
-                const auto remoteDirectoryNormalized = normalizePath(remoteDirectory, serverSettings->data().pathOs);
-                return remoteDirectoryNormalized + localPath.mid(localDirectory.size());
+            if (isPathUnderThisDirectory(localPathNormalized, localDirectory)) {
+                const auto remoteDirectoryNormalized = normalizePath(remoteDirectory, remotePathOs);
+                auto relativePathIndex = localDirectory.size();
+                if (localDirectory.endsWith('/')) {
+                    relativePathIndex -= 1;
+                }
+                return normalizePath(
+                    remoteDirectoryNormalized + localPathNormalized.mid(relativePathIndex),
+                    remotePathOs
+                );
+            }
+        }
+        return {};
+    }
+
+    QString Servers::fromLocalToRemoteDirectory(const QString& localPath, const ServerSettings* serverSettings) {
+        return fromLocalToRemoteDirectory(localPath, serverSettings->data().pathOs);
+    }
+
+    QString Servers::fromRemoteToLocalDirectory(const QString& remotePath, PathOs remotePathOs) {
+        const auto remotePathNormalized = normalizePath(remotePath, remotePathOs);
+        for (const auto& [localDirectory, remoteDirectory] : mCurrentServerMountedDirectories) {
+            const auto remoteDirectoryNormalized = normalizePath(remoteDirectory, remotePathOs);
+            if (isPathUnderThisDirectory(remotePathNormalized, remoteDirectoryNormalized)) {
+                auto relativePathIndex = remoteDirectoryNormalized.size();
+                if (remoteDirectoryNormalized.endsWith('/')) {
+                    relativePathIndex -= 1;
+                }
+                return normalizePath(localDirectory + remotePathNormalized.mid(relativePathIndex), localPathOs);
             }
         }
         return {};
     }
 
     QString Servers::fromRemoteToLocalDirectory(const QString& remotePath, const ServerSettings* serverSettings) {
-        for (const auto& [localDirectory, remoteDirectory] : mCurrentServerMountedDirectories) {
-            const auto remoteDirectoryNormalized = normalizePath(remoteDirectory, serverSettings->data().pathOs);
-            if (isPathUnderThisDirectory(remoteDirectory, remoteDirectoryNormalized)) {
-                return localDirectory + remotePath.mid(remoteDirectoryNormalized.size());
-            }
-        }
-        return {};
+        return fromRemoteToLocalDirectory(remotePath, serverSettings->data().pathOs);
     }
 
     LastTorrents Servers::currentServerLastTorrents() const {
@@ -223,13 +256,12 @@ namespace tremotesf {
         }
         mSettings->beginGroup(currentServerName());
         LastTorrents torrents{};
-        torrents.torrents =
-            createTransforming<std::vector<LastTorrents::Torrent>>(rpc->torrents(), [](const auto& torrent) {
-                return LastTorrents::Torrent{
-                    .hashString = torrent->data().hashString,
-                    .finished = torrent->data().isFinished()
-                };
-            });
+        torrents.torrents = toContainer<std::vector>(rpc->torrents() | std::views::transform([](const auto& torrent) {
+                                                         return LastTorrents::Torrent{
+                                                             .hashString = torrent->data().hashString,
+                                                             .finished = torrent->data().isFinished()
+                                                         };
+                                                     }));
         mSettings->setValue(lastTorrentsKey, torrents.toVariant());
         mSettings->endGroup();
     }
@@ -237,9 +269,11 @@ namespace tremotesf {
     QStringList Servers::currentServerLastDownloadDirectories(const ServerSettings* serverSettings) const {
         QStringList directories{};
         mSettings->beginGroup(currentServerName());
-        directories = createTransforming<QStringList>(
-            mSettings->value(lastDownloadDirectoriesKey).toStringList(),
-            [serverSettings](const QString& dir) { return normalizePath(dir, serverSettings->data().pathOs); }
+        directories = toContainer<QStringList>(
+            mSettings->value(lastDownloadDirectoriesKey).toStringList() |
+            std::views::transform([serverSettings](const QString& dir) {
+                return normalizePath(dir, serverSettings->data().pathOs);
+            })
         );
         mSettings->endGroup();
         return directories;
@@ -412,9 +446,12 @@ namespace tremotesf {
         }
     }
 
-    Servers::Servers(QObject* parent)
+    Servers::Servers(QSettings* settings, QObject* parent)
         : QObject(parent),
-          mSettings(new QSettings(settingsFormat, QSettings::UserScope, qApp->organizationName(), fileName, this)) {
+          mSettings(
+              settings ? settings
+                       : new QSettings(settingsFormat, QSettings::UserScope, qApp->organizationName(), fileName, this)
+          ) {
         mSettings->setFallbacksEnabled(false);
         if (hasServers()) {
             bool foundCurrent = false;

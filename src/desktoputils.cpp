@@ -9,15 +9,18 @@
 #include <QApplication>
 #include <QDesktopServices>
 #include <QDir>
+#include <QIcon>
 #include <QMessageBox>
-#include <QProxyStyle>
 #include <QRegularExpression>
 #include <QStringBuilder>
+#include <QStyle>
 #include <QTextCursor>
 #include <QTextCharFormat>
 #include <QTextDocument>
 #include <QTextDocumentFragment>
 #include <QUrl>
+
+#include <fmt/format.h>
 
 #include "literals.h"
 #include "log/log.h"
@@ -25,29 +28,60 @@
 SPECIALIZE_FORMATTER_FOR_QDEBUG(QUrl)
 
 namespace tremotesf::desktoputils {
-    QString statusIconPath(StatusIcon icon) {
+    const QIcon& statusIcon(StatusIcon icon) {
         switch (icon) {
-        case ActiveIcon:
-            return ":/active.svg"_l1;
-        case CheckingIcon:
-            return ":/checking.svg"_l1;
-        case DownloadingIcon:
-            return ":/downloading.svg"_l1;
-        case ErroredIcon:
-            return ":/errored.svg"_l1;
-        case PausedIcon:
-            return ":/paused.svg"_l1;
-        case QueuedIcon:
-            return ":/queued.svg"_l1;
-        case SeedingIcon:
-            return ":/seeding.svg"_l1;
-        case StalledDownloadingIcon:
-            return ":/stalled-downloading.svg"_l1;
-        case StalledSeedingIcon:
-            return ":/stalled-seeding.svg"_l1;
+        case ActiveIcon: {
+            static const QIcon qicon(":/active.svg"_l1);
+            return qicon;
+        }
+        case CheckingIcon: {
+            static const QIcon qicon(":/checking.svg"_l1);
+            return qicon;
+        }
+        case DownloadingIcon: {
+            static const QIcon qicon(":/downloading.svg"_l1);
+            return qicon;
+        }
+        case ErroredIcon: {
+            static const QIcon qicon(":/errored.svg"_l1);
+            return qicon;
+        }
+        case PausedIcon: {
+            static const QIcon qicon(":/paused.svg"_l1);
+            return qicon;
+        }
+        case QueuedIcon: {
+            static const QIcon qicon(":/queued.svg"_l1);
+            return qicon;
+        }
+        case SeedingIcon: {
+            static const QIcon qicon(":/seeding.svg"_l1);
+            return qicon;
+        }
+        case StalledDownloadingIcon: {
+            static const QIcon qicon(":/stalled-downloading.svg"_l1);
+            return qicon;
         }
 
-        return {};
+        case StalledSeedingIcon: {
+            static QIcon qicon(":/stalled-seeding.svg"_l1);
+            return qicon;
+        }
+        }
+
+        throw std::logic_error(
+            fmt::format("Unknown StatusIcon value {}", static_cast<std::underlying_type_t<StatusIcon>>(icon))
+        );
+    }
+
+    const QIcon& standardFileIcon() {
+        static const auto icon = qApp->style()->standardIcon(QStyle::SP_FileIcon);
+        return icon;
+    }
+
+    const QIcon& standardDirIcon() {
+        static const auto icon = qApp->style()->standardIcon(QStyle::SP_DirIcon);
+        return icon;
     }
 
     void openFile(const QString& filePath, QWidget* parent) {
@@ -69,15 +103,15 @@ namespace tremotesf::desktoputils {
         };
 
         if (!QFile::exists(filePath)) {
-            logWarning("Can't open file {}, it does not exist", filePath);
+            warning().log("Can't open file {}, it does not exist", filePath);
             showDialogOnError(qApp->translate("tremotesf", "This file/directory does not exist"));
             return;
         }
 
         const auto url = QUrl::fromLocalFile(filePath);
-        logInfo("Executing QDesktopServices::openUrl() for {}", url);
+        info().log("Executing QDesktopServices::openUrl() for {}", url);
         if (!QDesktopServices::openUrl(url)) {
-            logWarning("QDesktopServices::openUrl() failed for {}", url);
+            warning().log("QDesktopServices::openUrl() failed for {}", url);
             showDialogOnError({});
         }
     }

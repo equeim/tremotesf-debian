@@ -8,8 +8,7 @@
 #include <QDateTime>
 #include <QObject>
 #include <QString>
-
-#include "log/formatters.h"
+#include <QTimeZone>
 
 class QJsonObject;
 class QUrl;
@@ -36,8 +35,10 @@ namespace tremotesf {
         const QString& announce() const { return mAnnounce; };
         const QString& site() const { return mSite; };
 
+        int tier() const { return mTier; }
+
         Status status() const { return mStatus; };
-        QString errorMessage() const { return mErrorMessage; };
+        const QString& errorMessage() const { return mErrorMessage; };
 
         int peers() const { return mPeers; };
         int seeders() const { return mSeeders; }
@@ -46,16 +47,19 @@ namespace tremotesf {
 
         bool update(const QJsonObject& trackerMap);
 
+        void replaceAnnounceUrl(const QString& announceUrl) { mAnnounce = announceUrl; }
+
         bool operator==(const Tracker& other) const = default;
 
     private:
         QString mAnnounce{};
         QString mSite{};
+        int mTier{};
 
         Status mStatus{};
         QString mErrorMessage{};
 
-        QDateTime mNextUpdateTime{{}, {}, Qt::UTC};
+        QDateTime mNextUpdateTime{{}, {}, QTimeZone::utc()};
 
         int mPeers{};
         int mSeeders{};
@@ -68,7 +72,5 @@ namespace tremotesf {
         QString registrableDomainFromUrl(const QUrl& url);
     }
 }
-
-SPECIALIZE_FORMATTER_FOR_Q_ENUM(tremotesf::Tracker::Status)
 
 #endif // TREMOTESF_RPC_TRACKER_H

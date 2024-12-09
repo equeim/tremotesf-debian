@@ -19,23 +19,24 @@ Table of Contents
 ## Installation
 ### Dependencies
 - C++ compiler with partial C++20 support. Minimum tested versions of GCC and Clang toolchains:
-  1. GCC 10
-  2. Clang 11 with libstdc++ 10
-  3. Clang 13 with libc++ 13
-- CMake 3.16 or newer (3.21 on Windows)
-- Qt 6.6 or newer or 5.15 (Core, Network, Concurrent, Gui, Widgets modules)
-- fmt 7.0 or newer
-- KWidgetsAddons
-- libpsl
-- cxxopts
+  1. GCC 12
+  2. Clang 17 with libstdc++ 13
+  3. Clang 17 with libc++ 17
+- CMake 3.25 or newer
+- Qt 6.6 or newer or 5.15 (Core, Network, Gui, Widgets modules)
+- fmt 9.1 or newer
+- KWidgetsAddons 5.103 or newer
+- libpsl 0.21.2 or newer
+- cxxopts 3.1.1 or newer
 - Qt Test module (for tests only)
 - OpenSSL 1.1.1 or newer (for tests only)
 - cpp-httplib 0.11.0 or newer (for tests only, optional)
 
 On GNU/Linux and BSD, also:
-- Gettext 0.19.7 or newer
+- Gettext 0.21 or newer
 - Qt D-Bus module
 - KWindowSystem (with Qt5/KF5 kwayland-integration is also needed as runtime dependency)
+- Qt's SVG image format plugin as a runtime dependency (usually located somewhere at /usr/lib64/qt6/plugins/imageformats/libqsvg.so)
 
 On Windows, also:
 - Windows 11 SDK is needed to build
@@ -72,8 +73,9 @@ CMake configuration options:
 - Debian - [Official repository](https://packages.debian.org/sid/tremotesf), or [my own OBS repository](https://build.opensuse.org/package/show/home:equeim:tremotesf/Tremotesf)
 
 ```sh
-wget -qO - https://download.opensuse.org/repositories/home:/equeim:/tremotesf/Debian_12/Release.key | sudo tee /etc/apt/trusted.gpg.d/tremotesf.asc
-sudo add-apt-repository "deb http://download.opensuse.org/repositories/home:/equeim:/tremotesf/Debian_12/ /"
+debian_version="$(source /etc/os-release && echo "$VERSION_ID")"
+wget -qO - "https://download.opensuse.org/repositories/home:/equeim:/tremotesf/Debian_${debian_version}/Release.key" | sudo tee /etc/apt/trusted.gpg.d/tremotesf.asc
+sudo add-apt-repository "deb http://download.opensuse.org/repositories/home:/equeim:/tremotesf/Debian_${debian_version}/ /"
 sudo apt update
 sudo apt install tremotesf
 ```
@@ -101,8 +103,9 @@ sudo zypper in tremotesf
 - Ubuntu - [OBS](https://build.opensuse.org/package/show/home:equeim:tremotesf/Tremotesf)
 
 ```sh
-wget -qO - https://download.opensuse.org/repositories/home:/equeim:/tremotesf/xUbuntu_23.10/Release.key | sudo tee /etc/apt/trusted.gpg.d/tremotesf.asc
-sudo add-apt-repository "deb http://download.opensuse.org/repositories/home:/equeim:/tremotesf/xUbuntu_23.10/ /"
+ubuntu_version="$(source /etc/os-release && echo "$VERSION_ID")"
+wget -qO - "https://download.opensuse.org/repositories/home:/equeim:/tremotesf/xUbuntu_${ubuntu_version}/Release.key" | sudo tee /etc/apt/trusted.gpg.d/tremotesf.asc
+sudo add-apt-repository "deb http://download.opensuse.org/repositories/home:/equeim:/tremotesf/xUbuntu_${ubuntu_version}/ /"
 sudo apt update
 sudo apt install tremotesf
 ```

@@ -16,6 +16,8 @@
 #include <QJsonArray>
 #include <QJsonValue>
 
+#include <fmt/format.h>
+
 #include "log/log.h"
 
 SPECIALIZE_FORMATTER_FOR_QDEBUG(QJsonValue)
@@ -44,13 +46,13 @@ namespace tremotesf::impl {
             const auto jsonValue = [&] {
                 if constexpr (std::same_as<JsonConstantT, int>) {
                     if (!value.isDouble()) {
-                        logWarning("JSON field with key {} and value {} is not a number", key, value);
+                        warning().log("JSON field with key {} and value {} is not a number", key, value);
                         return std::optional<int>{};
                     }
                     return std::optional(value.toInt());
                 } else if constexpr (std::same_as<JsonConstantT, QLatin1String>) {
                     if (!value.isString()) {
-                        logWarning("JSON field with key {} and value {} is not a string", key, value);
+                        warning().log("JSON field with key {} and value {} is not a string", key, value);
                         return std::optional<QString>{};
                     }
                     return std::optional(value.toString());
@@ -59,20 +61,18 @@ namespace tremotesf::impl {
             if (!jsonValue.has_value()) {
                 return {};
             }
-            const auto found = std::find_if(mappings.begin(), mappings.end(), [&](const auto& mapping) {
-                return mapping.jsonValue == jsonValue;
-            });
+            const auto found =
+                std::ranges::find(mappings, jsonValue, &EnumMapping<EnumConstantT, JsonConstantT>::jsonValue);
             if (found == mappings.end()) {
-                logWarning("JSON field with key {} has unknown value {}", key, value);
+                warning().log("JSON field with key {} has unknown value {}", key, value);
                 return {};
             }
             return found->enumValue;
         }
 
         JsonConstantT toJsonConstant(EnumConstantT value) const {
-            const auto found = std::find_if(mappings.begin(), mappings.end(), [value](const auto& mapping) {
-                return mapping.enumValue == value;
-            });
+            const auto found =
+                std::ranges::find(mappings, value, &EnumMapping<EnumConstantT, JsonConstantT>::enumValue);
             if (found == mappings.end()) {
                 throw std::logic_error(fmt::format("Unknown enum value {}", value));
             }
@@ -85,7 +85,7 @@ namespace tremotesf::impl {
 
     inline QJsonArray toJsonArray(std::span<const int> ids) {
         QJsonArray array{};
-        std::copy(ids.begin(), ids.end(), std::back_inserter(array));
+        std::ranges::copy(ids, std::back_insert_iterator(array));
         return array;
     }
 

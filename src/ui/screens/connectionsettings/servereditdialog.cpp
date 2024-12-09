@@ -19,7 +19,6 @@
 #include <QIcon>
 #include <QItemSelectionModel>
 #include <QKeyEvent>
-#include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
 #include <QMessageBox>
@@ -27,7 +26,6 @@
 #include <QPushButton>
 #include <QRegularExpressionValidator>
 #include <QScrollArea>
-#include <QScrollBar>
 #include <QSpinBox>
 #include <QTableWidget>
 #include <QVBoxLayout>
@@ -39,7 +37,6 @@
 #include "target_os.h"
 #include "ui/widgets/commondelegate.h"
 #include "rpc/servers.h"
-#include "formatutils.h"
 #include "serversmodel.h"
 
 namespace tremotesf {
@@ -49,7 +46,8 @@ namespace tremotesf {
         constexpr std::array proxyTypeComboBoxValues{
             ConnectionConfiguration::ProxyType::Default,
             ConnectionConfiguration::ProxyType::Http,
-            ConnectionConfiguration::ProxyType::Socks5
+            ConnectionConfiguration::ProxyType::Socks5,
+            ConnectionConfiguration::ProxyType::None,
         };
 
         ConnectionConfiguration::ProxyType proxyTypeFromComboBoxIndex(int index) {
@@ -292,6 +290,10 @@ namespace tremotesf {
                 //: SOCKS5 proxy option
                 mProxyTypeComboBox->addItem(qApp->translate("tremotesf", "SOCKS5"));
                 break;
+            case ConnectionConfiguration::ProxyType::None:
+                //: None proxy option
+                mProxyTypeComboBox->addItem(qApp->translate("tremotesf", "None"));
+                break;
             }
         }
         QObject::connect(
@@ -463,9 +465,15 @@ namespace tremotesf {
     }
 
     void ServerEditDialog::setProxyFieldsVisible() {
-        const bool visible =
-            (proxyTypeFromComboBoxIndex(mProxyTypeComboBox->currentIndex()) !=
-             ConnectionConfiguration::ProxyType::Default);
+        bool visible{};
+        switch (proxyTypeFromComboBoxIndex(mProxyTypeComboBox->currentIndex())) {
+        case ConnectionConfiguration::ProxyType::Default:
+        case ConnectionConfiguration::ProxyType::None:
+            visible = false;
+            break;
+        default:
+            visible = true;
+        }
         for (int i = 1, max = mProxyLayout->rowCount(); i < max; ++i) {
             mProxyLayout->itemAt(i, QFormLayout::LabelRole)->widget()->setVisible(visible);
             mProxyLayout->itemAt(i, QFormLayout::FieldRole)->widget()->setVisible(visible);
@@ -574,7 +582,7 @@ namespace tremotesf {
             try {
                 target->setPlainText(readFile(fileDialog->selectedFiles().first()));
             } catch (const QFileError& e) {
-                logWarningWithException(e, "Failed to read certificate from file");
+                warning().logWithException(e, "Failed to read certificate from file");
             }
         });
 

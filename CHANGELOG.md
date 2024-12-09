@@ -1,5 +1,59 @@
 # Changelog
 
+## [2.7.4] - 2024-12-06
+### Fixed
+- Tray icon disappearing in some X11 environments
+- Wrong translation being loaded on Windows
+
+## [2.7.3] - 2024-11-20
+### Fixed
+- Black screen issues when closing fullscreen window on macOS
+- File dialog being shown twice in some Linux environments
+- Crash with GCC 12
+- Torrent's details in list not being updated for most recently added torrent
+
+## [2.7.2] - 2024-09-15
+### Fixed
+- Opening download directory of a torrent with some file managers
+
+## [2.7.1] - 2024-09-13
+### Added
+- Dialog is shown when fatal error occurs on Windows
+- TREMOTESF_ASAN CMake option to build with AddressSanitizer (off by default)
+
+### Fixed
+- Performance regression on Windows (and potential performance improvements on other platforms)
+- Crash on Windows
+- Issues with mounted directories mapping
+
+## [2.7.0] - 2024-08-31
+### Added
+- Merging trackers when adding existing torrent
+- Add Torrent Link dialogs allows multiple links
+- "None" proxy option to bypass system proxy
+
+### Changed
+- Removed Debian 11 and Ubuntu 22.04 support - minimum baseline now corresponds to Debian 12
+  - Minimum CMake version is 3.25
+  - Minimum fmt version is 9.1
+  - Minimum KF5 version is 5.103
+  - Minimum libpsl version is 0.21.2
+  - Minimum cxxopts version is 3.1.1
+  - Minimum gettext version is 0.21
+- Removed dependency on Qt Concurrent module
+- Breeze is used as a fallback icon theme and should be installed as a runtime dependency
+- Clarified runtime dependency on Qt's SVG image format plugin
+- Notification portal is used for notifications in Flatpak
+- Added workaround for Transmission not showing an error for torrent when all trackers have failed
+- Networking and some other async code is rewritten using C++ coroutines. Hopefully nothing is broken :)
+
+### Fixed
+- Mapping of mounted directories working incorrectly in some cases
+
+## [2.6.3] - 2024-04-22
+### Fixed
+- Qt 6.7 compatibility
+
 ## [2.6.2] - 2024-04-01
 ### Fixed
 - Application being closed when opening file picker in Qt 6 builds

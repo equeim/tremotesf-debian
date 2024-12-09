@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <chrono>
 #include <utility>
 
 #include <QApplication>
@@ -10,37 +9,45 @@
 #include <QLibraryInfo>
 #include <QLoggingCategory>
 #include <QLocale>
-#include <QTimer>
 #include <QTranslator>
 
 #include <fmt/ranges.h>
 
 #include "commandlineparser.h"
-#include "fileutils.h"
 #include "literals.h"
-#include "main_windows.h"
-#include "recoloringsvgiconengineplugin.h"
 #include "signalhandler.h"
 #include "target_os.h"
 #include "ipc/ipcclient.h"
 #include "log/log.h"
+#include "ui/iconthemesetup.h"
 #include "ui/savewindowstatedispatcher.h"
 #include "ui/screens/mainwindow/mainwindow.h"
 
+#ifdef Q_OS_WIN
+#    include "main_windows.h"
+#    include "windowsfatalerrorhandlers.h"
+#endif
+
 #ifdef Q_OS_MACOS
+#    include <chrono>
+#    include <QTimer>
 #    include "ipc/fileopeneventhandler.h"
+using namespace std::chrono_literals;
+#endif
+
+#ifdef TREMOTESF_USE_BUNDLED_QT_TRANSLATIONS
+#    include "fileutils.h"
 #endif
 
 SPECIALIZE_FORMATTER_FOR_QDEBUG(QLocale)
 
-using namespace std::chrono_literals;
 using namespace tremotesf;
 
 namespace {
 #ifdef Q_OS_MACOS
     std::pair<QStringList, QStringList> receiveFileOpenEvents(int& argc, char** argv) {
         std::pair<QStringList, QStringList> filesAndUrls{};
-        logInfo("Waiting for file open events");
+        info().log("Waiting for file open events");
         const QGuiApplication app(argc, argv);
         const FileOpenEventHandler handler{};
         QObject::connect(
@@ -53,7 +60,7 @@ namespace {
             }
         );
         QTimer::singleShot(500ms, &app, [] {
-            logInfo("Did not receive file open events");
+            info().log("Did not receive file open events");
             QCoreApplication::quit();
         });
         QCoreApplication::exec();
@@ -68,15 +75,15 @@ namespace {
         if (!client->isConnected()) {
             return false;
         }
-        logInfo("Only one instance of Tremotesf can be run at the same time");
+        info().log("Only one instance of Tremotesf can be run at the same time");
         const auto activateOtherInstance = [&client](const QStringList& files, const QStringList& urls) {
             if (files.isEmpty() && urls.isEmpty()) {
-                logInfo("Activating other instance");
+                info().log("Activating other instance");
                 client->activateWindow();
             } else {
-                logInfo("Activating other instance and requesting torrent adding");
-                logInfo("files = {}", files);
-                logInfo("urls = {}", urls);
+                info().log("Activating other instance and requesting torrent adding");
+                info().log("files = {}", files);
+                info().log("urls = {}", urls);
                 client->addTorrents(files, urls);
             }
         };
@@ -89,6 +96,37 @@ namespace {
 #endif
         activateOtherInstance(args.files, args.urls);
         return true;
+    }
+
+    void logLocaleInfo() {
+        if (!tremotesfLoggingCategory().isDebugEnabled()) {
+            return;
+        }
+        QLocale locale{};
+        debug().log("Current locale is: {}", locale.name());
+        debug().log("Language: {}", locale.language());
+        debug().log("Script: {}", locale.script());
+#if QT_VERSION_MAJOR >= 6
+        debug().log("Territory: {}", locale.territory());
+#endif
+        debug().log("UI languages: {}", locale.uiLanguages());
+    }
+
+    bool
+    loadTranslation(QTranslator& translator, const QString& filename, const QString& prefix, const QString& directory) {
+        // https://bugreports.qt.io/browse/QTBUG-129434
+        static const bool applyWorkaround = [] {
+            const bool apply = (QLibraryInfo::version() == QVersionNumber(6, 7, 3));
+            debug().log("Applying QTranslator workaround for Qt 6.7.3");
+            return apply;
+        }();
+        QLocale locale{};
+        if (applyWorkaround) {
+            QString actualFilename = filename + prefix + locale.name();
+            return translator.load(actualFilename, directory);
+        } else {
+            return translator.load(locale, filename, prefix, directory);
+        }
     }
 }
 
@@ -108,20 +146,22 @@ int main(int argc, char** argv) {
             return EXIT_SUCCESS;
         }
     } catch (const std::runtime_error& e) {
-        logWarning("Failed to parse command line arguments: {}", e.what());
+        warning().log("Failed to parse command line arguments: {}", e.what());
         return EXIT_FAILURE;
     }
 
     if (args.enableDebugLogs.has_value()) {
         overrideDebugLogs(*args.enableDebugLogs);
     }
-    if (tremotesfLoggingCategory().isDebugEnabled()) {
-        logDebug("Debug logging is enabled");
-    }
 
 #ifdef Q_OS_WIN
+    windowsSetUpFatalErrorHandlers();
     const WindowsLogger logger{};
 #endif
+
+    if (tremotesfLoggingCategory().isDebugEnabled()) {
+        debug().log("Debug logging is enabled");
+    }
 
     // Setup handler for UNIX signals or Windows console handler
     const SignalHandler signalHandler{};
@@ -149,14 +189,11 @@ int main(int argc, char** argv) {
     // https://bugs.kde.org/show_bug.cgi?id=483439
     QCoreApplication::setQuitLockEnabled(false);
 
-    if constexpr (targetOs == TargetOs::Windows) {
-        windowsInitApplication();
-    }
-#if defined(TREMOTESF_BUNDLED_ICON_THEME)
-    QIcon::setThemeSearchPaths({resolveExternalBundledResourcesPath("icons"_l1)});
-    QIcon::setThemeName(TREMOTESF_BUNDLED_ICON_THEME ""_l1);
-    QApplication::setStyle(new RecoloringSvgIconStyle(qApp));
+#ifdef Q_OS_WIN
+    windowsInitApplication();
 #endif
+
+    setupIconTheme();
 
     QGuiApplication::setDesktopFileName(TREMOTESF_APP_ID ""_l1);
     QGuiApplication::setWindowIcon(QIcon::fromTheme(TREMOTESF_APP_ID ""_l1));
@@ -164,26 +201,36 @@ int main(int argc, char** argv) {
     // End of QApplication initialization
     //
 
+    logLocaleInfo();
+
     QTranslator qtTranslator;
     {
         const QString qtTranslationsPath =
 #ifdef TREMOTESF_USE_BUNDLED_QT_TRANSLATIONS
             resolveExternalBundledResourcesPath("qt-translations"_l1);
 #else
-            QLibraryInfo::location(QLibraryInfo::TranslationsPath);
+#    if QT_VERSION_MAJOR >= 6
+            QLibraryInfo::path(
+#    else
+            QLibraryInfo::location(
+#    endif
+                QLibraryInfo::TranslationsPath
+            );
 #endif
-        if (qtTranslator.load(QLocale{}, "qt"_l1, "_"_l1, qtTranslationsPath)) {
+        if (loadTranslation(qtTranslator, "qt"_l1, "_"_l1, qtTranslationsPath)) {
+            info().log("Loaded Qt translation {}", qtTranslator.filePath());
             qApp->installTranslator(&qtTranslator);
         } else {
-            logWarning("Failed to load Qt translation for {} from {}", QLocale(), qtTranslationsPath);
+            warning().log("Failed to load Qt translation for {} from {}", QLocale(), qtTranslationsPath);
         }
     }
 
     QTranslator appTranslator;
-    if (appTranslator.load(QLocale{}, {}, {}, ":/translations/"_l1)) {
+    if (loadTranslation(appTranslator, {}, {}, ":/translations/"_l1)) {
+        info().log("Loaded Tremotesf translation {}", appTranslator.filePath());
         qApp->installTranslator(&appTranslator);
     } else {
-        logWarning("Failed to load Tremotesf translation for {}", QLocale{});
+        warning().log("Failed to load Tremotesf translation for {}", QLocale{});
     }
 
     const SaveWindowStateDispatcher saveStateDispatcher{};
@@ -196,6 +243,6 @@ int main(int argc, char** argv) {
     }
 
     const int exitStatus = QCoreApplication::exec();
-    logDebug("Returning from main with exit status {}", exitStatus);
+    debug().log("Returning from main with exit status {}", exitStatus);
     return exitStatus;
 }

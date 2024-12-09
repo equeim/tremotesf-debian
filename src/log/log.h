@@ -7,12 +7,18 @@
 
 #include <concepts>
 #include <type_traits>
+#include <string>
+#include <source_location>
 
 #include <QLoggingCategory>
 #include <QMessageLogger>
 #include <QString>
 
-#include <fmt/core.h>
+#if FMT_VERSION_MAJOR >= 11
+#    include <fmt/base.h>
+#else
+#    include <fmt/core.h>
+#endif
 
 #ifdef Q_OS_WIN
 #    include <guiddef.h>
@@ -20,12 +26,6 @@
 #endif
 
 #include "formatters.h"
-
-#if FMT_VERSION < 80000
-#    define FORMAT_STRING fmt::string_view
-#else
-#    define FORMAT_STRING fmt::format_string<Args...>
-#endif
 
 #if __has_cpp_attribute(gnu::always_inline)
 #    define ALWAYS_INLINE [[gnu::always_inline]] inline
@@ -38,16 +38,11 @@
 #endif
 
 namespace tremotesf {
-    constexpr auto tremotesfLoggingCategoryName = "tremotesf";
-    Q_DECLARE_LOGGING_CATEGORY(tremotesfLoggingCategory)
-
-    void overrideDebugLogs(bool enable);
-
     namespace impl {
         template<typename T>
-        concept IsException = std::derived_from<std::remove_reference_t<T>, std::exception>
+        concept IsException = std::derived_from<std::remove_cvref_t<T>, std::exception>
 #ifdef Q_OS_WIN
-                              || std::derived_from<std::remove_reference_t<T>, winrt::hresult_error>
+                              || std::derived_from<std::remove_cvref_t<T>, winrt::hresult_error>
 #endif
             ;
 
@@ -59,154 +54,159 @@ namespace tremotesf {
 #endif
             ;
 
-        struct QMessageLoggerDelegate {
-            constexpr explicit QMessageLoggerDelegate(
-                QtMsgType type, const char* fileName, int lineNumber, const char* functionName
-            )
-                : type(type), context(fileName, lineNumber, functionName, tremotesfLoggingCategoryName) {}
+        template<std::convertible_to<QString> T>
+        ALWAYS_INLINE QString convertToQString(const T& string) {
+            return static_cast<QString>(string);
+        }
 
-            /**
-             * Actual log function
-             */
-            void log(const QString& string) const;
+        template<std::convertible_to<std::string_view> T>
+            requires(!std::convertible_to<T, QString> && !impl::IsQStringView<T>)
+        ALWAYS_INLINE QString convertToQString(const T& string) {
+            const auto stringView = static_cast<std::string_view>(string);
+            return QString::fromUtf8(stringView.data(), static_cast<QString::size_type>(stringView.size()));
+        }
 
-            /**
-             * Shortcuts to print strings without going through fmt
-             */
+        template<impl::IsQStringView T>
+        ALWAYS_INLINE QString convertToQString(const T& string) {
+            return string.toString();
+        }
 
-            template<std::convertible_to<QString> T>
-            ALWAYS_INLINE void log(const T& string) const {
-                log(static_cast<QString>(string));
-            }
+        template<typename T>
+        concept CanConvertToQString = !std::same_as<std::remove_cvref_t<T>, QString> &&
+                                      requires(T string) { tremotesf::impl::convertToQString(string); };
 
-            template<std::convertible_to<std::string_view> T>
-                requires(!std::convertible_to<T, QString>)
-            ALWAYS_INLINE void log(const T& string) const {
-                const auto stringView = static_cast<std::string_view>(string);
-                log(QString::fromUtf8(stringView.data(), static_cast<QString::size_type>(stringView.size())));
-            }
+        inline void printNewline(FILE* stream) { std::fwrite("\n", 1, 1, stream); }
+    }
 
-            template<IsQStringView T>
-            ALWAYS_INLINE void log(const T& string) const {
-                log(string.toString());
-            }
+    constexpr auto tremotesfLoggingCategoryName = "tremotesf";
+    Q_DECLARE_LOGGING_CATEGORY(tremotesfLoggingCategory)
 
-            /**
-             * Format then print
-             */
+    void overrideDebugLogs(bool enable);
 
-            template<typename T>
-            ALWAYS_INLINE void log(const T& value) const {
-                log(singleArgumentFormatString, value);
-            }
-
-            template<typename... Args>
-                requires(sizeof...(Args) != 0)
-            ALWAYS_INLINE void log(FORMAT_STRING fmt, Args&&... args) const {
-                log(fmt::format(fmt, std::forward<Args>(args)...));
-            }
-
-            /**
-             * Special function to print nested exceptions recursively
-             */
-
-            template<IsException T>
-            ALWAYS_INLINE void log(const T& exception) const {
-                logExceptionRecursively<false>(exception);
-            }
-
-            template<IsException E, typename T>
-            ALWAYS_INLINE void logWithException(const E& e, const T& value) const {
-                log(value);
-                logExceptionRecursively<true>(e);
-            }
-
-            template<IsException E, typename... Args>
-                requires(sizeof...(Args) != 0)
-            ALWAYS_INLINE void logWithException(const E& e, FORMAT_STRING fmt, Args&&... args) const {
-                log(fmt, std::forward<Args>(args)...);
-                logExceptionRecursively<true>(e);
-            }
-
-        private:
-            template<bool PrintCausedBy>
-            ALWAYS_INLINE void logExceptionRecursively(const std::exception& e) const {
-                return logExceptionRecursivelyImpl<std::exception, PrintCausedBy>(e);
-            }
-
-            template<bool PrintCausedBy>
-            ALWAYS_INLINE void logExceptionRecursively(const std::system_error& e) const {
-                return logExceptionRecursivelyImpl<std::system_error, PrintCausedBy>(e);
-            }
-
+    std::string formatExceptionRecursively(const std::exception& e);
+    std::string formatExceptionRecursively(const std::system_error& e);
 #ifdef Q_OS_WIN
-            template<bool PrintCausedBy>
-            ALWAYS_INLINE void logExceptionRecursively(const winrt::hresult_error& e) const {
-                return logExceptionRecursivelyImpl<winrt::hresult_error, PrintCausedBy>(e);
-            }
+    std::string formatExceptionRecursively(const winrt::hresult_error& e);
 #endif
 
-            template<IsException E, bool PrintCausedBy>
-            void logExceptionRecursivelyImpl(const E& e) const;
+    struct Logger {
+        ALWAYS_INLINE consteval explicit Logger(QtMsgType type, std::source_location location)
+            : type(type),
+              context(
+                  location.file_name(),
+                  static_cast<int>(location.line()),
+                  location.function_name(),
+                  tremotesfLoggingCategoryName
+              ) {}
 
-            QtMsgType type;
-            QMessageLogContext context;
-        };
+        ALWAYS_INLINE void log(const QString& string) const {
+            if (isEnabled()) {
+                logImpl(string);
+            }
+        }
 
-        extern template void
-        QMessageLoggerDelegate::logExceptionRecursivelyImpl<std::exception, true>(const std::exception&) const;
-        extern template void
-        QMessageLoggerDelegate::logExceptionRecursivelyImpl<std::exception, false>(const std::exception&) const;
-        extern template void
-        QMessageLoggerDelegate::logExceptionRecursivelyImpl<std::system_error, true>(const std::system_error&) const;
-        extern template void
-        QMessageLoggerDelegate::logExceptionRecursivelyImpl<std::system_error, false>(const std::system_error&) const;
-#ifdef Q_OS_WIN
-        extern template void
-        QMessageLoggerDelegate::logExceptionRecursivelyImpl<winrt::hresult_error, true>(const winrt::hresult_error&)
-            const;
-        extern template void
-        QMessageLoggerDelegate::logExceptionRecursivelyImpl<winrt::hresult_error, false>(const winrt::hresult_error&)
-            const;
+        template<impl::CanConvertToQString T>
+        ALWAYS_INLINE void log(const T& string) const {
+            if (isEnabled()) {
+                logImpl(impl::convertToQString(string));
+            }
+        }
+
+        /**
+         * Format then print
+         */
+
+        template<typename T>
+        ALWAYS_INLINE void log(const T& value) const {
+            if (isEnabled()) {
+                logWithFormatArgs(
+                    fmt::format_string<const T&>(impl::singleArgumentFormatString),
+                    fmt::make_format_args(value)
+                );
+            }
+        }
+
+        template<typename... Args>
+            requires(sizeof...(Args) != 0)
+        ALWAYS_INLINE void log(fmt::format_string<Args...> fmt, const Args&... args) const {
+            if (isEnabled()) {
+                logWithFormatArgs(fmt, fmt::make_format_args(args...));
+            }
+        }
+
+        /**
+         * Special functions to print nested exceptions recursively
+         */
+
+        template<impl::IsException E, typename T>
+        ALWAYS_INLINE void logWithException(const E& e, const T& value) const {
+            if (isEnabled()) {
+                const auto formattedException = formatExceptionRecursively(e);
+                logWithFormatArgs(
+                    fmt::format_string<const T&, const std::string&>("{}\n{}"),
+                    fmt::make_format_args(value, formattedException)
+                );
+            }
+        }
+
+        template<impl::IsException E, typename... Args>
+            requires(sizeof...(Args) != 0)
+        ALWAYS_INLINE void logWithException(const E& e, fmt::format_string<Args...> fmt, const Args&... args) const {
+            if (isEnabled()) {
+                auto message = formatToQString(fmt, fmt::make_format_args(args...));
+                message += '\n';
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+                message += formatExceptionRecursively(e);
+#else
+                message += formatExceptionRecursively(e).c_str();
 #endif
+                logImpl(message);
+            }
+        }
 
-        inline constexpr auto printlnFormatString = "{}\n";
+    private:
+        ALWAYS_INLINE bool isEnabled() const { return tremotesfLoggingCategory().isEnabled(type); }
+
+        static QString formatToQString(fmt::string_view fmt, fmt::format_args args);
+        void logWithFormatArgs(fmt::string_view fmt, fmt::format_args args) const;
+
+        /**
+         * Actual log function
+         */
+        void logImpl(const QString& string) const;
+
+        QtMsgType type;
+        QMessageLogContext context;
+    };
+
+    ALWAYS_INLINE consteval Logger debug(std::source_location location = std::source_location::current()) {
+        return Logger(QtDebugMsg, location);
+    }
+
+    ALWAYS_INLINE consteval Logger info(std::source_location location = std::source_location::current()) {
+        return Logger(QtInfoMsg, location);
+    }
+
+    ALWAYS_INLINE consteval Logger warning(std::source_location location = std::source_location::current()) {
+        return Logger(QtWarningMsg, location);
+    }
+
+    ALWAYS_INLINE consteval Logger fatal(std::source_location location = std::source_location::current()) {
+        return Logger(QtFatalMsg, location);
     }
 
     template<typename T>
-    void printlnStdout(const T& value) {
-        fmt::print(stdout, impl::printlnFormatString, value);
+    ALWAYS_INLINE void printlnStdout(const T& value) {
+        fmt::print(stdout, fmt::format_string<const T&>(impl::singleArgumentFormatString), value);
+        impl::printNewline(stdout);
     }
 
     template<typename... Args>
         requires(sizeof...(Args) != 0)
-    void printlnStdout(FORMAT_STRING fmt, Args&&... args) {
-        fmt::print(stdout, impl::printlnFormatString, fmt::format(fmt, std::forward<Args>(args)...));
+    ALWAYS_INLINE void printlnStdout(fmt::format_string<Args...> fmt, const Args&... args) {
+        fmt::vprint(stdout, fmt, fmt::make_format_args(args...));
+        impl::printNewline(stdout);
     }
 }
-
-#define TREMOTESF_IMPL_CREATE_LOGGER_DELEGATE(msgType) \
-    tremotesf::impl::QMessageLoggerDelegate(msgType, QT_MESSAGELOG_FILE, QT_MESSAGELOG_LINE, QT_MESSAGELOG_FUNC)
-
-#define TREMOTESF_IMPL_LOG(msgType, ...)                                     \
-    do {                                                                     \
-        if (tremotesf::tremotesfLoggingCategory().isEnabled(msgType)) {      \
-            TREMOTESF_IMPL_CREATE_LOGGER_DELEGATE(msgType).log(__VA_ARGS__); \
-        }                                                                    \
-    } while (0)
-
-#define TREMOTESF_IMPL_LOG_WITH_EXCEPTION(msgType, ...)                                   \
-    do {                                                                                  \
-        if (tremotesf::tremotesfLoggingCategory().isEnabled(msgType)) {                   \
-            TREMOTESF_IMPL_CREATE_LOGGER_DELEGATE(msgType).logWithException(__VA_ARGS__); \
-        }                                                                                 \
-    } while (0)
-
-#define logDebug(...)                TREMOTESF_IMPL_LOG(QtDebugMsg, __VA_ARGS__)
-#define logDebugWithException(...)   TREMOTESF_IMPL_LOG_WITH_EXCEPTION(QtDebugMsg, __VA_ARGS__)
-#define logInfo(...)                 TREMOTESF_IMPL_LOG(QtInfoMsg, __VA_ARGS__)
-#define logInfoWithException(...)    TREMOTESF_IMPL_LOG_WITH_EXCEPTION(QtInfoMsg, __VA_ARGS__)
-#define logWarning(...)              TREMOTESF_IMPL_LOG(QtWarningMsg, __VA_ARGS__)
-#define logWarningWithException(...) TREMOTESF_IMPL_LOG_WITH_EXCEPTION(QtWarningMsg, __VA_ARGS__)
 
 #endif // TREMOTESF_LOG_LOG_H

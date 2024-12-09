@@ -24,13 +24,12 @@
 #    include "ipc/fileopeneventhandler.h"
 #endif
 
-SPECIALIZE_FORMATTER_FOR_Q_ENUM(QCborError::Code)
 SPECIALIZE_FORMATTER_FOR_QDEBUG(QCborValue)
 
 namespace fmt {
     template<>
     struct formatter<QCborParserError> : tremotesf::SimpleFormatter {
-        fmt::format_context::iterator format(QCborParserError error, fmt::format_context& ctx) FORMAT_CONST {
+        fmt::format_context::iterator format(QCborParserError error, fmt::format_context& ctx) const {
             return fmt::format_to(
                 ctx.out(),
                 "{} (error code {})",
@@ -68,16 +67,16 @@ namespace tremotesf {
         if (!server->listen(name)) {
             if (server->serverError() == QAbstractSocket::AddressInUseError) {
                 // We already tried to connect to it, removing
-                logWarning("Removing dead socket");
+                warning().log("Removing dead socket");
                 if (QLocalServer::removeServer(name)) {
                     if (!server->listen(name)) {
-                        logWarning("Failed to create socket: {}", server->errorString());
+                        warning().log("Failed to create socket: {}", server->errorString());
                     }
                 } else {
-                    logWarning("Failed to remove socket: {}", server->errorString());
+                    warning().log("Failed to remove socket: {}", server->errorString());
                 }
             } else {
-                logWarning("Failed to create socket: {}", server->errorString());
+                warning().log("Failed to create socket: {}", server->errorString());
             }
         }
 
@@ -105,7 +104,7 @@ namespace tremotesf {
             name += '-';
             name += QString::number(sessionId);
         } catch (const std::system_error& e) {
-            logWarningWithException(e, "IpcServerSocket: failed to append session id to socket name");
+            warning().logWithException(e, "IpcServerSocket: failed to append session id to socket name");
         }
 #endif
         return name;
@@ -127,16 +126,16 @@ namespace tremotesf {
             QObject::connect(socket, &QLocalSocket::readyRead, this, [this, socket]() {
                 const QByteArray message(socket->readAll());
                 if (message.size() == 1 && message.front() == activateWindowMessage) {
-                    logInfo("IpcServerSocket: window activation requested");
-                    emit windowActivationRequested({}, {});
+                    info().log("IpcServerSocket: window activation requested");
+                    emit windowActivationRequested({});
                 } else {
                     QCborParserError error{};
                     const auto cbor = QCborValue::fromCbor(message, &error);
                     if (error.error != QCborError::NoError) {
-                        logWarning("IpcServerSocket: failed to parse CBOR message: {}", error);
+                        warning().log("IpcServerSocket: failed to parse CBOR message: {}", error);
                         return;
                     }
-                    logInfo("Arguments received: {}", cbor);
+                    info().log("Arguments received: {}", cbor);
                     const auto map = cbor.toMap();
                     const auto files = toStringList(map[keyFiles]);
                     const auto urls = toStringList(map[keyUrls]);

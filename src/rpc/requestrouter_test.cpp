@@ -9,7 +9,7 @@
 
 #include <QHostAddress>
 #include <QJsonDocument>
-#include <QSysInfo>
+#include <QScopeGuard>
 #include <QTest>
 #include <QThreadPool>
 #include <QTcpServer>
@@ -18,10 +18,12 @@
 #include <fmt/chrono.h>
 #include <httplib.h>
 
+#include "coroutines/coroutines.h"
 #include "fileutils.h"
 #include "literals.h"
 #include "log/log.h"
 #include "requestrouter.h"
+#include "rpc.h"
 
 using namespace std::chrono;
 using namespace std::chrono_literals;
@@ -29,7 +31,13 @@ using namespace std::string_literals;
 using namespace tremotesf;
 using namespace tremotesf::impl;
 
-// NOLINTBEGIN(bugprone-unchecked-optional-access, cppcoreguidelines-avoid-do-while)
+#define QFAIL_THROW(message)                                                 \
+    do {                                                                     \
+        QTest::qFail(static_cast<const char*>(message), __FILE__, __LINE__); \
+        throw std::exception();                                              \
+    } while (false)
+
+// NOLINTBEGIN(bugprone-unchecked-optional-access)
 
 namespace {
     constexpr auto testApiPath = "/"_l1;
@@ -46,11 +54,11 @@ namespace {
     public:
         template<typename... Args>
         explicit TestHttpServer(Args&&... args) : mServer(std::forward<Args>(args)...) {
-            logInfo("Server is valid = {}", mServer.is_valid());
+            info().log("Server is valid = {}", mServer.is_valid());
             mServer.set_keep_alive_max_count(1);
             mServer.set_keep_alive_timeout(1);
             port = mServer.bind_to_any_port(host.toStdString());
-            logInfo("Bound to port {}", port);
+            info().log("Bound to port {}", port);
             mServer.Post(testApiPath.data(), [=, this](const httplib::Request& req, httplib::Response& res) {
                 httplib::Server::Handler handler{};
                 {
@@ -65,9 +73,9 @@ namespace {
             });
 
             mListenFuture = std::async([=, this] {
-                logInfo("Starting listening on address {} and port {}", host, port);
+                info().log("Starting listening on address {} and port {}", host, port);
                 const bool ok = mServer.listen_after_bind();
-                logInfo("Stopped listening, ok = {}", ok);
+                info().log("Stopped listening, ok = {}", ok);
             });
         }
 
@@ -78,10 +86,10 @@ namespace {
                 if (mListenFuture.wait_for(10ms) == std::future_status::ready) break;
             }
             if (mServer.is_running()) {
-                logInfo("Stopping server");
+                info().log("Stopping server");
                 mServer.stop();
             } else {
-                logWarning("Server has already stopped");
+                warning().log("Server has already stopped");
             }
             mListenFuture.wait();
         }
@@ -95,6 +103,7 @@ namespace {
             const std::unique_lock lock(mHandlerMutex);
             mHandler = std::move(handler);
         }
+
         void clearHandler() {
             const std::unique_lock lock(mHandlerMutex);
             mHandler = {};
@@ -142,12 +151,12 @@ namespace {
 
         void cleanup() {
             mServer.clearHandler();
-            mRouter.cancelPendingRequestsAndClearSessionId();
+            mRouter.abortNetworkRequestsAndClearSessionId();
         }
 
         void checkUrlIsCorrect() {
             mServer.handle([&](const httplib::Request&, httplib::Response& res) { success(res); });
-            const auto response = waitForResponse("foo"_l1, QByteArray{}, RequestRouter::RequestType::Independent);
+            const auto response = waitForResponse("foo"_l1, QByteArray{});
             QCOMPARE(response.has_value(), true);
             QCOMPARE(response->arguments, QJsonObject{});
             QCOMPARE(response->success, true);
@@ -168,7 +177,7 @@ namespace {
                 }
             });
 
-            const auto response = waitForResponse(method, arguments, RequestRouter::RequestType::Independent);
+            const auto response = waitForResponse(method, arguments);
             QCOMPARE(response.has_value(), true);
             QCOMPARE(response->success, true);
         }
@@ -183,10 +192,9 @@ namespace {
                 mRouter.setConfiguration(std::move(config));
             }
 
-            const auto error = waitForError("foo"_l1, QByteArray{}, RequestRouter::RequestType::Independent);
+            const auto error = waitForError("foo"_l1, QByteArray{});
             QCOMPARE(error.has_value(), true);
             QCOMPARE(error.value(), RpcError::TimedOut);
-            logInfo("Returning");
         }
 
         void checkTcpConnectionRefusedIsHandled() {
@@ -196,11 +204,11 @@ namespace {
                 config.serverUrl.setPort(9);
                 mRouter.setConfiguration(std::move(config));
             }
-            const auto error = waitForError("foo"_l1, QByteArray{}, RequestRouter::RequestType::Independent);
+            const auto error = waitForError("foo"_l1, QByteArray{});
             QCOMPARE(error.has_value(), true);
             if (error.value() == RpcError::TimedOut) {
                 // This is not what we test here but it can happen on some systems
-                QWARN("Connection to port 9 timed out instead of being refused");
+                warning().log("Connection to port 9 timed out instead of being refused");
             } else {
                 QCOMPARE(error.value(), RpcError::ConnectionError);
             }
@@ -217,7 +225,7 @@ namespace {
                 config.serverUrl.setPort(tcpServer.serverPort());
                 mRouter.setConfiguration(std::move(config));
             }
-            const auto error = waitForError("foo"_l1, QByteArray{}, RequestRouter::RequestType::Independent);
+            const auto error = waitForError("foo"_l1, QByteArray{});
             QCOMPARE(error.has_value(), true);
             QCOMPARE(error.value(), RpcError::ConnectionError);
         }
@@ -234,7 +242,7 @@ namespace {
                 config.retryAttempts = retryAttempts;
                 mRouter.setConfiguration(std::move(config));
             }
-            const auto error = waitForError("foo"_l1, QByteArray{}, RequestRouter::RequestType::Independent);
+            const auto error = waitForError("foo"_l1, QByteArray{});
             QCOMPARE(error.has_value(), true);
             QCOMPARE(error.value(), RpcError::ConnectionError);
             QCOMPARE(requestsCount.load(), retryAttempts + 1);
@@ -252,7 +260,7 @@ namespace {
                 config.serverUrl.setPort(server.port);
                 mRouter.setConfiguration(std::move(config));
             }
-            const auto error = waitForError("foo"_l1, QByteArray{}, RequestRouter::RequestType::Independent);
+            const auto error = waitForError("foo"_l1, QByteArray{});
             QCOMPARE(error.has_value(), true);
             QCOMPARE(error.value(), RpcError::ConnectionError);
         }
@@ -271,7 +279,7 @@ namespace {
                     QSslCertificate::fromPath(TEST_DATA_PATH "/root-certificate.pem", QSsl::Pem);
                 mRouter.setConfiguration(std::move(config));
             }
-            const auto response = waitForResponse("foo"_l1, QByteArray{}, RequestRouter::RequestType::Independent);
+            const auto response = waitForResponse("foo"_l1, QByteArray{});
             QCOMPARE(response.has_value(), true);
             QCOMPARE(response->success, true);
         }
@@ -289,7 +297,7 @@ namespace {
                 config.serverCertificateChain = QSslCertificate::fromPath(TEST_DATA_PATH "/chain.pem", QSsl::Pem);
                 mRouter.setConfiguration(std::move(config));
             }
-            const auto response = waitForResponse("foo"_l1, QByteArray{}, RequestRouter::RequestType::Independent);
+            const auto response = waitForResponse("foo"_l1, QByteArray{});
             QCOMPARE(response.has_value(), true);
             QCOMPARE(response->success, true);
         }
@@ -309,7 +317,7 @@ namespace {
                     QSslCertificate::fromPath(TEST_DATA_PATH "/root-certificate.pem", QSsl::Pem);
                 mRouter.setConfiguration(std::move(config));
             }
-            const auto error = waitForError("foo"_l1, QByteArray{}, RequestRouter::RequestType::Independent);
+            const auto error = waitForError("foo"_l1, QByteArray{});
             QCOMPARE(error.has_value(), true);
             QCOMPARE(error.value(), RpcError::ConnectionError);
         }
@@ -336,7 +344,7 @@ namespace {
                 }
                 mRouter.setConfiguration(std::move(config));
             }
-            const auto response = waitForResponse("foo"_l1, QByteArray{}, RequestRouter::RequestType::Independent);
+            const auto response = waitForResponse("foo"_l1, QByteArray{});
             QCOMPARE(response.has_value(), true);
             QCOMPARE(response->success, true);
         }
@@ -345,14 +353,14 @@ namespace {
             mServer.handle([&](const httplib::Request&, httplib::Response& res) {
                 res.set_content(invalidJsonResponse, contentType);
             });
-            const auto error = waitForError("foo"_l1, QByteArray{}, RequestRouter::RequestType::Independent);
+            const auto error = waitForError("foo"_l1, QByteArray{});
             QCOMPARE(error.has_value(), true);
             QCOMPARE(error.value(), RpcError::ParseError);
         }
 
         void checkConflictErrorWithoutSessionIdIsHandled() {
             mServer.handle([&](const httplib::Request&, httplib::Response& res) { res.status = 409; });
-            const auto error = waitForError("foo"_l1, QByteArray{}, RequestRouter::RequestType::Independent);
+            const auto error = waitForError("foo"_l1, QByteArray{});
             QCOMPARE(error.has_value(), true);
             QCOMPARE(error.value(), RpcError::ConnectionError);
         }
@@ -363,7 +371,7 @@ namespace {
                 res.status = 409;
                 res.set_header(sessionIdHeader, sessionIdValue);
             });
-            const auto error = waitForError("foo"_l1, QByteArray{}, RequestRouter::RequestType::Independent);
+            const auto error = waitForError("foo"_l1, QByteArray{});
             QCOMPARE(error.has_value(), true);
             QCOMPARE(error.value(), RpcError::ConnectionError);
         }
@@ -378,7 +386,7 @@ namespace {
                 }
                 res.set_header(sessionIdHeader, sessionIdValue);
             });
-            const auto response = waitForResponse("foo"_l1, QByteArray{}, RequestRouter::RequestType::Independent);
+            const auto response = waitForResponse("foo"_l1, QByteArray{});
             QCOMPARE(response.has_value(), true);
             QCOMPARE(response->arguments, QJsonObject{});
             QCOMPARE(response->success, true);
@@ -394,13 +402,13 @@ namespace {
                 }
                 res.set_header(sessionIdHeader, sessionIdValue);
             });
-            auto response = waitForResponse("foo"_l1, QByteArray{}, RequestRouter::RequestType::Independent);
+            auto response = waitForResponse("foo"_l1, QByteArray{});
             QCOMPARE(response.has_value(), true);
             QCOMPARE(response->arguments, QJsonObject{});
             QCOMPARE(response->success, true);
 
             sessionIdValue = "session id 2";
-            response = waitForResponse("foo"_l1, QByteArray{}, RequestRouter::RequestType::Independent);
+            response = waitForResponse("foo"_l1, QByteArray{});
             QCOMPARE(response.has_value(), true);
             QCOMPARE(response->arguments, QJsonObject{});
             QCOMPARE(response->success, true);
@@ -420,7 +428,7 @@ namespace {
                 config.password = password;
                 mRouter.setConfiguration(std::move(config));
             }
-            const auto response = waitForResponse("foo"_l1, QByteArray{}, RequestRouter::RequestType::Independent);
+            const auto response = waitForResponse("foo"_l1, QByteArray{});
             QCOMPARE(response.has_value(), true);
             QCOMPARE(response->arguments, QJsonObject{});
             QCOMPARE(response->success, true);
@@ -430,89 +438,27 @@ namespace {
             mServer.handle([&](const httplib::Request& req, httplib::Response& res) {
                 checkAuthentication(req, res, "foo", "bar");
             });
-            const auto error = waitForError("foo"_l1, QByteArray{}, RequestRouter::RequestType::Independent);
+            const auto error = waitForError("foo"_l1, QByteArray{});
             QCOMPARE(error.has_value(), true);
             QCOMPARE(error.value(), RpcError::AuthenticationError);
         }
 
-        void checkIndependentRequest() {
-            mServer.handle([&](const httplib::Request&, httplib::Response& res) { success(res); });
-
-            std::optional<RequestRouter::Response> response{};
-            mRouter.postRequest("foo"_l1, QByteArray{}, RequestRouter::RequestType::Independent, [&](auto r) {
-                response = std::move(r);
-            });
-
-            QCOMPARE(mRouter.hasPendingDataUpdateRequests(), false);
-
-            const bool ok = QTest::qWaitFor([&] { return response.has_value(); });
-            if (!ok) {
-                QWARN("Timed out when waiting for response");
+        void checkRequestAbort() {
+            QTcpServer tcpServer{};
+            tcpServer.listen(QHostAddress::LocalHost);
+            {
+                RequestRouter::RequestsConfiguration config = mRouter.configuration().value();
+                config.serverUrl.setPort(tcpServer.serverPort());
+                mRouter.setConfiguration(std::move(config));
             }
 
-            QCOMPARE(response.has_value(), true);
-            QCOMPARE(response->arguments, QJsonObject{});
-            QCOMPARE(response->success, true);
-
-            QCOMPARE(mRouter.hasPendingDataUpdateRequests(), false);
-        }
-
-        void checkDataUpdateRequest() {
-            mServer.handle([&](const httplib::Request&, httplib::Response& res) { success(res); });
-
-            std::optional<RequestRouter::Response> response{};
-            mRouter.postRequest("foo"_l1, QByteArray{}, RequestRouter::RequestType::DataUpdate, [&](auto r) {
-                response = std::move(r);
-            });
-
-            QCOMPARE(mRouter.hasPendingDataUpdateRequests(), true);
-
-            const bool ok = QTest::qWaitFor([&] { return response.has_value(); });
-            if (!ok) {
-                QWARN("Timed out when waiting for response");
-            }
-
-            QCOMPARE(response.has_value(), true);
-            QCOMPARE(response->arguments, QJsonObject{});
-            QCOMPARE(response->success, true);
-
-            QCOMPARE(mRouter.hasPendingDataUpdateRequests(), false);
-        }
-
-        void checkDataUpdateRequestCancellation() {
-            mServer.handle([&](const httplib::Request&, httplib::Response& res) { success(res); });
-
-            mRouter.postRequest("foo"_l1, QByteArray{}, RequestRouter::RequestType::DataUpdate, [&](auto) {});
-
-            QCOMPARE(mRouter.hasPendingDataUpdateRequests(), true);
-            mRouter.cancelPendingRequestsAndClearSessionId();
-            QCOMPARE(mRouter.hasPendingDataUpdateRequests(), false);
-        }
-
-        void checkMultipleDataUpdateRequestsCancellation() {
-            mServer.handle([&](const httplib::Request&, httplib::Response& res) { success(res); });
-
-            mRouter.postRequest("foo"_l1, QByteArray{}, RequestRouter::RequestType::DataUpdate, [&](auto) {});
-            mRouter.postRequest("foo"_l1, QByteArray{}, RequestRouter::RequestType::DataUpdate, [&](auto) {});
-
-            QCOMPARE(mRouter.hasPendingDataUpdateRequests(), true);
-            mRouter.cancelPendingRequestsAndClearSessionId();
-            QCOMPARE(mRouter.hasPendingDataUpdateRequests(), false);
-        }
-
-    private:
-        template<typename... Args>
-        std::variant<RequestRouter::Response, RpcError, std::monostate> waitForResponseOrError(const Args&... args) {
             std::variant<RequestRouter::Response, RpcError, std::monostate> responseOrError = std::monostate{};
-            const auto connection = QObject::connect(
-                &mRouter,
-                &RequestRouter::requestFailed,
-                this,
-                [&](RpcError error,
-                    [[maybe_unused]] const QString& errorMessage,
-                    [[maybe_unused]] const QString& detailedErrorMessage) { responseOrError = error; }
-            );
-            mRouter.postRequest(args..., [&](auto response) { responseOrError = std::move(response); });
+            CoroutineScope scope{};
+            scope.launch(waitForResponseOrErrorCoroutine(mRouter.postRequest("foo"_l1, QByteArray{}), responseOrError));
+
+            QTest::qWait(100);
+            mRouter.abortNetworkRequestsAndClearSessionId();
+
             const bool ok = QTest::qWaitFor(
                 [&] { return !std::holds_alternative<std::monostate>(responseOrError); },
                 static_cast<int>(
@@ -521,9 +467,49 @@ namespace {
                 )
             );
             if (!ok) {
-                QWARN("Timed out when waiting for response");
+                warning().log("Timed out when waiting for response");
             }
-            QObject::disconnect(connection);
+
+            if (std::holds_alternative<RpcError>(responseOrError)) {
+                QCOMPARE(std::get<RpcError>(responseOrError), RpcError::TimedOut);
+            } else {
+                QFAIL("Request must return error");
+            }
+        }
+
+    private:
+        Coroutine<> waitForResponseOrErrorCoroutine(
+            Coroutine<RequestRouter::Response> requestCoroutine,
+            std::variant<RequestRouter::Response, RpcError, std::monostate>& destination
+        ) {
+            const auto connection = QObject::connect(
+                &mRouter,
+                &RequestRouter::requestFailed,
+                this,
+                [&](RpcError error,
+                    [[maybe_unused]] const QString& errorMessage,
+                    [[maybe_unused]] const QString& detailedErrorMessage) { destination = error; },
+                Qt::DirectConnection
+            );
+            const auto connectionGuard = QScopeGuard([connection] { QObject::disconnect(connection); });
+            destination = co_await requestCoroutine;
+        }
+
+        template<typename... Args>
+        std::variant<RequestRouter::Response, RpcError, std::monostate> waitForResponseOrError(const Args&... args) {
+            std::variant<RequestRouter::Response, RpcError, std::monostate> responseOrError = std::monostate{};
+            CoroutineScope scope{};
+            scope.launch(waitForResponseOrErrorCoroutine(mRouter.postRequest(args...), responseOrError));
+            const bool ok = QTest::qWaitFor(
+                [&] { return !std::holds_alternative<std::monostate>(responseOrError); },
+                static_cast<int>(
+                    duration_cast<milliseconds>(testTimeout * (mRouter.configuration().value().retryAttempts + 1) + 1s)
+                        .count()
+                )
+            );
+            if (!ok) {
+                warning().log("Timed out when waiting for response");
+            }
             return responseOrError;
         }
 
@@ -545,11 +531,18 @@ namespace {
             return {};
         }
 
+        template<typename... Args>
+        Coroutine<> detachRequest(const Args&... args) {
+            co_await mRouter.postRequest(args...);
+        }
+
         TestHttpServer<httplib::Server> mServer{};
         QThreadPool mThreadPool{};
         RequestRouter mRouter{nullptr, &mThreadPool};
     };
 }
+
+// NOLINTEND(bugprone-unchecked-optional-access)
 
 QTEST_GUILESS_MAIN(RequestRouterTest)
 

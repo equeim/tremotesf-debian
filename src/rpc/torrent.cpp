@@ -2,22 +2,25 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "torrent.h"
-
 #include <algorithm>
 #include <array>
+#include <map>
+#include <ranges>
 #include <stdexcept>
 
-#include <QCoreApplication>
 #include <QJsonArray>
 #include <QJsonObject>
-#include <QLocale>
 
+#include <fmt/ranges.h>
+
+#include "rpc.h"
+#include "serversettings.h"
+#include "torrent.h"
+
+#include "log/log.h"
 #include "jsonutils.h"
 #include "itemlistupdater.h"
-#include "log/log.h"
 #include "pathutils.h"
-#include "rpc.h"
 #include "stdutils.h"
 
 namespace tremotesf {
@@ -179,7 +182,7 @@ namespace tremotesf {
             }();
             const auto foundKey = mapping.find(stringKey);
             if (foundKey == mapping.end()) {
-                logWarning("Unknown torrent field '{}'", stringKey);
+                warning().log("Unknown torrent field '{}'", stringKey);
                 return {};
             }
             return static_cast<TorrentData::UpdateKey>(foundKey->second);
@@ -196,6 +199,7 @@ namespace tremotesf {
         constexpr auto addTrackerKey = "trackerAdd"_l1;
         constexpr auto replaceTrackerKey = "trackerReplace"_l1;
         constexpr auto removeTrackerKey = "trackerRemove"_l1;
+        constexpr auto trackerListKey = "trackerList"_l1;
 
         constexpr auto statusMapper = EnumMapper(std::array{
             EnumMapping(TorrentData::Status::Paused, 0),
@@ -243,6 +247,7 @@ namespace tremotesf {
                 updateProperty(*key, i.value(), changed, firstTime, rpc);
             }
         }
+        applyTrackerErrorWorkaround(changed);
         return changed;
     }
 
@@ -260,6 +265,7 @@ namespace tremotesf {
                 updateProperty(*key, values[static_cast<QJsonArray::size_type>(i)], changed, firstTime, rpc);
             }
         }
+        applyTrackerErrorWorkaround(changed);
         return changed;
     }
 
@@ -276,104 +282,143 @@ namespace tremotesf {
             }
             return;
         case TorrentData::UpdateKey::AddedDate:
-            return updateDateTime(addedDate, value, changed);
+            updateDateTime(addedDate, value, changed);
+            return;
         case TorrentData::UpdateKey::Name:
-            return setChanged(name, value.toString(), changed);
+            setChanged(name, value.toString(), changed);
+            return;
         case TorrentData::UpdateKey::MagnetLink:
-            return setChanged(magnetLink, value.toString(), changed);
+            setChanged(magnetLink, value.toString(), changed);
+            return;
         case TorrentData::UpdateKey::QueuePosition:
-            return setChanged(queuePosition, value.toInt(), changed);
+            setChanged(queuePosition, value.toInt(), changed);
+            return;
         case TorrentData::UpdateKey::TotalSize:
-            return setChanged(totalSize, toInt64(value), changed);
+            setChanged(totalSize, toInt64(value), changed);
+            return;
         case TorrentData::UpdateKey::CompletedSize:
-            return setChanged(completedSize, toInt64(value), changed);
+            setChanged(completedSize, toInt64(value), changed);
+            return;
         case TorrentData::UpdateKey::LeftUntilDone:
-            return setChanged(leftUntilDone, toInt64(value), changed);
+            setChanged(leftUntilDone, toInt64(value), changed);
+            return;
         case TorrentData::UpdateKey::SizeWhenDone:
-            return setChanged(sizeWhenDone, toInt64(value), changed);
+            setChanged(sizeWhenDone, toInt64(value), changed);
+            return;
         case TorrentData::UpdateKey::PercentDone:
-            return setChanged(percentDone, value.toDouble(), changed);
+            setChanged(percentDone, value.toDouble(), changed);
+            return;
         case TorrentData::UpdateKey::RecheckProgress:
-            return setChanged(recheckProgress, value.toDouble(), changed);
+            setChanged(recheckProgress, value.toDouble(), changed);
+            return;
         case TorrentData::UpdateKey::Eta:
-            return setChanged(eta, value.toInt(), changed);
+            setChanged(eta, value.toInt(), changed);
+            return;
         case TorrentData::UpdateKey::MetadataPercentComplete:
-            return setChanged(metadataComplete, value.toInt() == 1, changed);
+            setChanged(metadataComplete, value.toInt() == 1, changed);
+            return;
         case TorrentData::UpdateKey::DownloadSpeed:
-            return setChanged(downloadSpeed, toInt64(value), changed);
+            setChanged(downloadSpeed, toInt64(value), changed);
+            return;
         case TorrentData::UpdateKey::UploadSpeed:
-            return setChanged(uploadSpeed, toInt64(value), changed);
+            setChanged(uploadSpeed, toInt64(value), changed);
+            return;
         case TorrentData::UpdateKey::DownloadSpeedLimited:
-            return setChanged(downloadSpeedLimited, value.toBool(), changed);
+            setChanged(downloadSpeedLimited, value.toBool(), changed);
+            return;
         case TorrentData::UpdateKey::DownloadSpeedLimit:
-            return setChanged(downloadSpeedLimit, value.toInt(), changed);
+            setChanged(downloadSpeedLimit, value.toInt(), changed);
+            return;
         case TorrentData::UpdateKey::UploadSpeedLimited:
-            return setChanged(uploadSpeedLimited, value.toBool(), changed);
+            setChanged(uploadSpeedLimited, value.toBool(), changed);
+            return;
         case TorrentData::UpdateKey::UploadSpeedLimit:
-            return setChanged(uploadSpeedLimit, value.toInt(), changed);
+            setChanged(uploadSpeedLimit, value.toInt(), changed);
+            return;
         case TorrentData::UpdateKey::TotalDownloaded:
-            return setChanged(totalDownloaded, toInt64(value), changed);
+            setChanged(totalDownloaded, toInt64(value), changed);
+            return;
         case TorrentData::UpdateKey::TotalUploaded:
-            return setChanged(totalUploaded, toInt64(value), changed);
+            setChanged(totalUploaded, toInt64(value), changed);
+            return;
         case TorrentData::UpdateKey::Ratio:
-            return setChanged(ratio, value.toDouble(), changed);
+            setChanged(ratio, value.toDouble(), changed);
+            return;
         case TorrentData::UpdateKey::RatioLimitMode:
-            return setChanged(ratioLimitMode, ratioLimitModeMapper.fromJsonValue(value, updateKeyString(key)), changed);
+            setChanged(ratioLimitMode, ratioLimitModeMapper.fromJsonValue(value, updateKeyString(key)), changed);
+            return;
         case TorrentData::UpdateKey::RatioLimit:
-            return setChanged(ratioLimit, value.toDouble(), changed);
+            setChanged(ratioLimit, value.toDouble(), changed);
+            return;
         case TorrentData::UpdateKey::PeersSendingToUsCount:
-            return setChanged(peersSendingToUsCount, value.toInt(), changed);
+            setChanged(peersSendingToUsCount, value.toInt(), changed);
+            return;
         case TorrentData::UpdateKey::PeersGettingFromUsCount:
-            return setChanged(peersGettingFromUsCount, value.toInt(), changed);
+            setChanged(peersGettingFromUsCount, value.toInt(), changed);
+            return;
         case TorrentData::UpdateKey::WebSeeders: {
-            return setChanged(
+            setChanged(
                 webSeeders,
-                createTransforming<std::vector<QString>>(
-                    value.toArray(),
-                    [](auto&& value) { return value.toString(); }
-                ),
+                toContainer<std::vector>(value.toArray() | std::views::transform([](auto value) {
+                                             return value.toString();
+                                         })),
                 changed
             );
+            return;
         }
         case TorrentData::UpdateKey::WebSeedersSendingToUsCount:
-            return setChanged(webSeedersSendingToUsCount, value.toInt(), changed);
+            setChanged(webSeedersSendingToUsCount, value.toInt(), changed);
+            return;
         case TorrentData::UpdateKey::Status:
-            return setChanged(status, statusMapper.fromJsonValue(value, updateKeyString(key)), changed);
-            break;
+            setChanged(status, statusMapper.fromJsonValue(value, updateKeyString(key)), changed);
+            return;
         case TorrentData::UpdateKey::Error:
-            return setChanged(error, errorMapper.fromJsonValue(value, updateKeyString(key)), changed);
+            setChanged(error, errorMapper.fromJsonValue(value, updateKeyString(key)), changed);
+            return;
         case TorrentData::UpdateKey::ErrorString:
-            return setChanged(errorString, value.toString(), changed);
+            setChanged(errorString, value.toString(), changed);
+            return;
         case TorrentData::UpdateKey::ActivityDate:
-            return updateDateTime(activityDate, value, changed);
+            updateDateTime(activityDate, value, changed);
+            return;
         case TorrentData::UpdateKey::DoneDate:
-            return updateDateTime(doneDate, value, changed);
+            updateDateTime(doneDate, value, changed);
+            return;
         case TorrentData::UpdateKey::PeersLimit:
-            return setChanged(peersLimit, value.toInt(), changed);
+            setChanged(peersLimit, value.toInt(), changed);
+            return;
         case TorrentData::UpdateKey::HonorSessionLimits:
-            return setChanged(honorSessionLimits, value.toBool(), changed);
+            setChanged(honorSessionLimits, value.toBool(), changed);
+            return;
         case TorrentData::UpdateKey::BandwidthPriority:
-            return setChanged(bandwidthPriority, priorityMapper.fromJsonValue(value, updateKeyString(key)), changed);
+            setChanged(bandwidthPriority, priorityMapper.fromJsonValue(value, updateKeyString(key)), changed);
+            return;
         case TorrentData::UpdateKey::IdleSeedingLimitMode:
-            return setChanged(
+            setChanged(
                 idleSeedingLimitMode,
                 idleSeedingLimitModeMapper.fromJsonValue(value, updateKeyString(key)),
                 changed
             );
+            return;
         case TorrentData::UpdateKey::IdleSeedingLimit:
-            return setChanged(idleSeedingLimit, value.toInt(), changed);
+            setChanged(idleSeedingLimit, value.toInt(), changed);
+            return;
         case TorrentData::UpdateKey::DownloadDirectory:
-            return setChanged(
+            setChanged(
                 downloadDirectory,
                 normalizePath(value.toString(), rpc->serverSettings()->data().pathOs),
                 changed
             );
+            return;
         case TorrentData::UpdateKey::Creator:
-            return setChanged(creator, value.toString(), changed);
+            setChanged(creator, value.toString(), changed);
+            return;
         case TorrentData::UpdateKey::CreationDate:
-            return updateDateTime(creationDate, value, changed);
+            updateDateTime(creationDate, value, changed);
+            return;
         case TorrentData::UpdateKey::Comment:
-            return setChanged(comment, value.toString(), changed);
+            setChanged(comment, value.toString(), changed);
+            return;
         case TorrentData::UpdateKey::TrackerStats: {
             std::vector<Tracker> newTrackers{};
             const QJsonArray trackerJsons = value.toArray();
@@ -383,9 +428,7 @@ namespace tremotesf {
             for (const auto& i : trackerJsons) {
                 const QJsonObject trackerMap = i.toObject();
                 const int trackerId = trackerMap.value("id"_l1).toInt();
-                const auto found = std::find_if(trackers.begin(), trackers.end(), [&](const auto& tracker) {
-                    return tracker.id() == trackerId;
-                });
+                const auto found = std::ranges::find(trackers, trackerId, &Tracker::id);
                 if (found == trackers.end()) {
                     newTrackers.emplace_back(trackerId, trackerMap);
                     changed = true;
@@ -407,6 +450,24 @@ namespace tremotesf {
             throw std::logic_error("UpdateKey::Count should not be mapped");
         }
         throw std::logic_error(fmt::format("Can't update key {}", static_cast<int>(intKey)));
+    }
+
+    void TorrentData::applyTrackerErrorWorkaround(bool& changed) {
+        // Sometimes Transmission doesn't propagate tracker error to the torrent's status
+        if (error != Error::None) {
+            return;
+        }
+        if (trackers.empty()) {
+            return;
+        }
+        // Only set error if *all* trackers have an error
+        if (std::ranges::any_of(trackers, [](const Tracker& tracker) { return tracker.errorMessage().isEmpty(); })) {
+            return;
+        }
+        // Set error from first tracker
+        error = Error::TrackerError;
+        errorString = trackers.front().errorMessage();
+        changed = true;
     }
 
     Torrent::Torrent(int id, const QJsonObject& object, Rpc* rpc, QObject* parent) : QObject(parent), mRpc(rpc) {
@@ -449,10 +510,9 @@ namespace tremotesf {
     }
 
     std::vector<std::optional<TorrentData::UpdateKey>> Torrent::mapUpdateKeys(const QJsonArray& stringKeys) {
-        return createTransforming<std::vector<std::optional<TorrentData::UpdateKey>>>(
-            stringKeys,
-            [](const auto& value) { return mapUpdateKey(value.toString()); }
-        );
+        return toContainer<std::vector>(stringKeys | std::views::transform([](auto value) {
+                                            return mapUpdateKey(value.toString());
+                                        }));
     }
 
     void Torrent::setDownloadSpeedLimited(bool limited) {
@@ -522,23 +582,129 @@ namespace tremotesf {
         mRpc->setTorrentProperty(mData.id, updateKeyString(TorrentData::UpdateKey::IdleSeedingLimit), limit);
     }
 
-    void Torrent::addTrackers(const QStringList& announceUrls) {
-        mRpc->setTorrentProperty(mData.id, addTrackerKey, QJsonArray::fromStringList(announceUrls), true);
+    namespace {
+        std::vector<std::set<QString>> toTieredAnnounceUrls(std::span<const Tracker> trackers) {
+            std::map<int, std::set<QString>> tiered{};
+            for (const auto& tracker : trackers) {
+                tiered[tracker.id()].insert(tracker.announce());
+            }
+            return moveToContainer<std::vector>(std::views::values(tiered));
+        }
+
+        QString toTrackerList(std::span<const std::set<QString>> tieredAnnounceUrls) {
+            QString trackerList{};
+            bool processedFirstTier{};
+            for (const auto& tier : tieredAnnounceUrls) {
+                if (processedFirstTier) {
+                    trackerList += "\n\n"_l1;
+                }
+                for (const auto& announceUrl : tier) {
+                    trackerList += announceUrl;
+                    trackerList += '\n';
+                }
+                processedFirstTier = true;
+            }
+            return trackerList;
+        }
+
+        bool isIntersect(const std::set<QString>& existingTier, const std::set<QString>& newTier) {
+            return std::ranges::any_of(newTier, [&](const auto& announceUrl) {
+                return existingTier.contains(announceUrl);
+            });
+        }
+
+        QJsonArray filterOutExistingTrackers(
+            std::span<const std::set<QString>> newTrackers, std::span<const Tracker> existingTrackers
+        ) {
+            QJsonArray trackersToAdd{};
+            for (const auto& tier : newTrackers) {
+                if (tier.empty()) continue;
+                // Transmission adds each announce URL to each own tier when using trackerAdd property, so take first URL from each tier
+                const auto& first = *tier.begin();
+                const auto existingTracker = std::ranges::find(existingTrackers, first, &Tracker::announce);
+                if (existingTracker == existingTrackers.end()) {
+                    trackersToAdd.push_back(first);
+                }
+            }
+            return trackersToAdd;
+        }
+    }
+
+    namespace impl {
+        std::vector<std::set<QString>> mergeTrackers(
+            const std::vector<std::set<QString>>& existingTrackers, std::span<const std::set<QString>> newTrackers
+        ) {
+            auto merged = existingTrackers;
+            for (const auto& newTier : newTrackers) {
+                if (newTier.empty()) continue;
+                const auto existingTier =
+                    std::ranges::find_if(merged, [&](auto& tier) { return isIntersect(tier, newTier); });
+                if (existingTier != merged.end()) {
+                    existingTier->insert(newTier.begin(), newTier.end());
+                } else {
+                    merged.push_back(newTier);
+                }
+            }
+            return merged;
+        }
+    }
+
+    void Torrent::addTrackers(std::span<const std::set<QString>> announceUrls) {
+        if (mRpc->serverSettings()->data().hasTrackerListProperty()) {
+            const auto existingTrackers = toTieredAnnounceUrls(mData.trackers);
+            debug().log("Merging exisiting trackers {} with {}", existingTrackers, announceUrls);
+            const auto merged = mergeTrackers(existingTrackers, announceUrls);
+            const bool changed = merged != existingTrackers;
+            debug().log("Result is {}, changed: {}", merged, changed);
+            if (changed) {
+                mRpc->setTorrentProperty(mData.id, trackerListKey, toTrackerList(merged), true);
+            }
+        } else {
+            auto trackersToAdd = filterOutExistingTrackers(announceUrls, mData.trackers);
+            if (!trackersToAdd.empty()) {
+                mRpc->setTorrentProperty(mData.id, addTrackerKey, std::move(trackersToAdd), true);
+            }
+        }
     }
 
     void Torrent::setTracker(int trackerId, const QString& announce) {
-        mRpc->setTorrentProperty(mData.id, replaceTrackerKey, QJsonArray{trackerId, announce}, true);
+        if (!mRpc->serverSettings()->data().hasTrackerListProperty()) {
+            mRpc->setTorrentProperty(mData.id, replaceTrackerKey, QJsonArray{trackerId, announce}, true);
+            return;
+        }
+        auto trackers = mData.trackers;
+        const auto tracker = std::ranges::find(trackers, trackerId, &Tracker::id);
+        if (tracker == trackers.end()) {
+            warning().log("setTracker: did not find tracker with id {}", trackerId);
+            return;
+        }
+        if (tracker->announce() == announce) {
+            return;
+        }
+        tracker->replaceAnnounceUrl(announce);
+        mRpc->setTorrentProperty(mData.id, trackerListKey, toTrackerList(toTieredAnnounceUrls(trackers)), true);
     }
 
     void Torrent::removeTrackers(std::span<const int> ids) {
-        mRpc->setTorrentProperty(mData.id, removeTrackerKey, toJsonArray(ids), true);
+        if (!mRpc->serverSettings()->data().hasTrackerListProperty()) {
+            mRpc->setTorrentProperty(mData.id, removeTrackerKey, toJsonArray(ids), true);
+            return;
+        }
+        auto trackers = mData.trackers;
+        const auto erased = std::erase_if(trackers, [ids](const auto& tracker) {
+            return std::ranges::find(ids, tracker.id()) != ids.end();
+        });
+        if (erased == 0) {
+            return;
+        }
+        mRpc->setTorrentProperty(mData.id, trackerListKey, toTrackerList(toTieredAnnounceUrls(trackers)), true);
     }
 
     void Torrent::setFilesEnabled(bool enabled) {
         if (enabled != mFilesEnabled) {
             mFilesEnabled = enabled;
             if (mFilesEnabled) {
-                mRpc->getTorrentsFiles(std::array{mData.id}, false);
+                mRpc->getTorrentFiles(mData.id);
             } else {
                 mFiles.clear();
             }
@@ -573,7 +739,7 @@ namespace tremotesf {
         if (enabled != mPeersEnabled) {
             mPeersEnabled = enabled;
             if (mPeersEnabled) {
-                mRpc->getTorrentsPeers(std::array{mData.id}, false);
+                mRpc->getTorrentPeers(mData.id);
             } else {
                 mPeers.clear();
             }
@@ -614,7 +780,7 @@ namespace tremotesf {
                         changed.push_back(static_cast<int>(i));
                     }
                 } else {
-                    logWarning("fileStats and files arrays have different sizes for torrent {}", *this);
+                    warning().log("fileStats and files arrays have different sizes for torrent {}", *this);
                 }
             } else {
                 if (static_cast<size_t>(fileStats.size()) == mFiles.size()) {
@@ -625,17 +791,19 @@ namespace tremotesf {
                         }
                     }
                 } else {
-                    logWarning("fileStats array has different size than in previous update for torrent {}", *this);
+                    warning().log("fileStats array has different size than in previous update for torrent {}", *this);
                 }
             }
         }
 
         emit filesUpdated(changed);
-        emit mRpc->torrentFilesUpdated(this, changed);
     }
 
     namespace {
-        using NewPeer = std::pair<QJsonObject, QString>;
+        struct NewPeer {
+            QJsonObject json;
+            QString address;
+        };
 
         class PeersListUpdater final : public ItemListUpdater<Peer, std::vector<NewPeer>> {
         public:
@@ -648,11 +816,7 @@ namespace tremotesf {
         protected:
             std::vector<NewPeer>::iterator
             findNewItemForItem(std::vector<NewPeer>& newPeers, const Peer& peer) override {
-                const auto& address = peer.address;
-                return std::find_if(newPeers.begin(), newPeers.end(), [address](const auto& newPeer) {
-                    const auto& [json, newPeerAddress] = newPeer;
-                    return newPeerAddress == address;
-                });
+                return std::ranges::find(newPeers, peer.address, &NewPeer::address);
             }
 
             void onAboutToRemoveItems(size_t, size_t) override{};
@@ -691,7 +855,7 @@ namespace tremotesf {
             for (const auto& i : peers) {
                 QJsonObject json = i.toObject();
                 QString address(json.value(Peer::addressKey).toString());
-                newPeers.emplace_back(std::move(json), std::move(address));
+                newPeers.push_back(NewPeer{std::move(json), std::move(address)});
             }
         }
 
@@ -699,8 +863,6 @@ namespace tremotesf {
         updater.update(mPeers, std::move(newPeers));
 
         emit peersUpdated(updater.removedIndexRanges, updater.changedIndexRanges, updater.addedCount);
-        emit mRpc
-            ->torrentPeersUpdated(this, updater.removedIndexRanges, updater.changedIndexRanges, updater.addedCount);
     }
 
     void Torrent::checkSingleFile(const QJsonObject& torrentMap) {
@@ -710,7 +872,7 @@ namespace tremotesf {
 
 namespace fmt {
     format_context::iterator
-    formatter<tremotesf::Torrent>::format(const tremotesf::Torrent& torrent, format_context& ctx) FORMAT_CONST {
+    formatter<tremotesf::Torrent>::format(const tremotesf::Torrent& torrent, format_context& ctx) const {
         return fmt::format_to(ctx.out(), "Torrent(id={}, name={})", torrent.data().id, torrent.data().name);
     }
 }

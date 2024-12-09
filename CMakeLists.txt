@@ -2,12 +2,8 @@
 #
 # SPDX-License-Identifier: CC0-1.0
 
-if (WIN32)
-    cmake_minimum_required(VERSION 3.21)
-else()
-    cmake_minimum_required(VERSION 3.16)
-endif()
-cmake_policy(VERSION ${CMAKE_MINIMUM_REQUIRED_VERSION}..3.27)
+cmake_minimum_required(VERSION 3.25)
+cmake_policy(VERSION ${CMAKE_MINIMUM_REQUIRED_VERSION}..3.30)
 
 set(languages CXX)
 if (APPLE)
@@ -15,9 +11,10 @@ if (APPLE)
     list(APPEND languages OBJCXX)
 endif ()
 
-project(tremotesf VERSION 2.6.2 LANGUAGES ${languages})
+project(tremotesf VERSION 2.7.4 LANGUAGES ${languages})
 
 option(TREMOTESF_QT6 "Build with Qt 6" ON)
+option(TREMOTESF_ASAN "Build with AddressSanitizer" OFF)
 
 set(TREMOTESF_WITH_HTTPLIB "auto" CACHE STRING "Where to find cpp-httplib dependency for unit tests. Possible values are: auto, system, bundled, none")
 if (NOT TREMOTESF_WITH_HTTPLIB MATCHES "^(auto|system|bundled|none)$")

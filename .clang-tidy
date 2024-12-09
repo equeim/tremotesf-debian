@@ -7,6 +7,7 @@ Checks: >
   android-*,
   bugprone-*,
   -bugprone-suspicious-include,
+  -bugprone-implicit-widening-of-multiplication-result,
   clang-analyzer-*,
   concurrency-*,
   cppcoreguidelines-*,
@@ -15,6 +16,7 @@ Checks: >
   -cppcoreguidelines-owning-memory,
   -cppcoreguidelines-pro-type-static-cast-downcast,
   -cppcoreguidelines-non-private-member-variables-in-classes,
+  -cppcoreguidelines-avoid-do-while
   -cppcoreguidelines-avoid-non-const-global-variables,
   -cppcoreguidelines-avoid-const-or-ref-data-members,
   -cppcoreguidelines-macro-usage,
@@ -29,6 +31,7 @@ Checks: >
   -modernize-use-nodiscard,
   -modernize-use-emplace,
   performance-*,
+  -performance-enum-size,
   portability-*,
   readability-*,
   -readability-braces-around-statements,
@@ -37,4 +40,9 @@ Checks: >
   -readability-magic-numbers,
   -readability-named-parameter,
   -readability-qualified-auto,
-  -readability-convert-member-functions-to-static
+  -readability-convert-member-functions-to-static,
+  -readability-redundant-inline-specifier,
+  -readability-redundant-member-init
+
+CheckOptions:
+  cppcoreguidelines-avoid-do-while.IgnoreMacros: true

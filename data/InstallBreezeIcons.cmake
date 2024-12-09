@@ -8,7 +8,7 @@ cmake_policy(SET CMP0057 NEW)
 
 set(breeze_icons_destination "${CMAKE_INSTALL_PREFIX}/${TREMOTESF_EXTERNAL_RESOURCES_PATH}/icons/breeze")
 
-file(INSTALL "${breeze_icons_SOURCE_DIR}/icons/index.theme" DESTINATION "${breeze_icons_destination}")
+file(INSTALL "${breeze_extracted_path}/icons/index.theme" DESTINATION "${breeze_icons_destination}")
 
 # Keep in sync with QIcon::fromTheme() calls in source code
 set(bundled_icon_files
@@ -54,24 +54,34 @@ set(bundled_icon_files
     window-close.svg
 )
 
+# Replacement for file(REAL_PATH) that doesn't work on Windows
+function(resolve_symlink_recursively path output_variable)
+    while (IS_SYMLINK "${path}")
+        message("Resolving symlink ${path}")
+        cmake_path(GET path PARENT_PATH parent)
+        file(READ_SYMLINK "${path}" target)
+        cmake_path(ABSOLUTE_PATH target BASE_DIRECTORY "${parent}" OUTPUT_VARIABLE path)
+        message("Resolved to ${path}")
+    endwhile()
+    set("${output_variable}" "${path}" PARENT_SCOPE)
+endfunction()
+
 set(files_to_install "")
-file(GLOB_RECURSE all_icon_files LIST_DIRECTORIES OFF "${breeze_icons_SOURCE_DIR}/icons/**/*.svg")
+file(GLOB_RECURSE all_icon_files LIST_DIRECTORIES OFF "${breeze_extracted_path}/icons/**/*.svg")
 foreach (icon_path IN LISTS all_icon_files)
     cmake_path(GET icon_path FILENAME icon_filename)
     if (icon_filename IN_LIST bundled_icon_files)
         cmake_path(GET icon_path PARENT_PATH icon_dir)
-        cmake_path(RELATIVE_PATH icon_dir BASE_DIRECTORY "${breeze_icons_SOURCE_DIR}/icons" OUTPUT_VARIABLE relative_icon_dir)
+        cmake_path(RELATIVE_PATH icon_dir BASE_DIRECTORY "${breeze_extracted_path}/icons" OUTPUT_VARIABLE relative_icon_dir)
         set(destination "${breeze_icons_destination}/${relative_icon_dir}")
         if (IS_SYMLINK "${icon_path}")
-            file(READ_SYMLINK "${icon_path}" original_icon_filename)
-            set(original_icon_path "${icon_dir}/${original_icon_filename}")
             if (WIN32 OR CMAKE_HOST_WIN32)
-                # Copy original file with new name
+                # Copy original file with linked name
+                resolve_symlink_recursively("${icon_path}" original_icon_path)
                 file(INSTALL "${original_icon_path}" DESTINATION "${destination}" RENAME "${icon_filename}")
             else()
-                # Copy original file and symlink
-                file(INSTALL "${original_icon_path}" DESTINATION "${destination}")
-                file(INSTALL "${icon_path}" DESTINATION "${destination}")
+                # Copy the whole symlink chain
+                file(INSTALL "${icon_path}" DESTINATION "${destination}" FOLLOW_SYMLINK_CHAIN)
             endif()
         else()
             file(INSTALL "${icon_path}" DESTINATION "${destination}")
@@ -79,7 +89,7 @@ foreach (icon_path IN LISTS all_icon_files)
     endif()
 endforeach()
 
-file(GLOB size_dirs LIST_DIRECTORIES ON "${breeze_icons_SOURCE_DIR}/icons/*/*")
+file(GLOB size_dirs LIST_DIRECTORIES ON "${breeze_extracted_path}/icons/*/*")
 foreach (size_dir IN LISTS size_dirs)
     if (IS_SYMLINK "${size_dir}")
         cmake_path(GET size_dir PARENT_PATH category_dir)
@@ -89,7 +99,7 @@ foreach (size_dir IN LISTS size_dirs)
         set(installed_original_size_dir "${destination}/${original_size}")
         if (EXISTS "${installed_original_size_dir}")
             if (WIN32 OR CMAKE_HOST_WIN32)
-                # Copy original directory with new name
+                # Copy original directory with linked name
                 cmake_path(GET size_dir FILENAME size)
                 file(INSTALL "${installed_original_size_dir}" DESTINATION "${destination}" RENAME "${size}")
             else()

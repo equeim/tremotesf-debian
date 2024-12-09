@@ -10,11 +10,12 @@
 
 #include <QPointer>
 
+#include "coroutines/scope.h"
 #include "ui/itemmodels/basetorrentfilesmodel.h"
-#include "rpc/torrent.h"
 
 namespace tremotesf {
     class Rpc;
+    class Torrent;
 
     class TorrentFilesModel final : public BaseTorrentFilesModel {
         Q_OBJECT
@@ -43,7 +44,7 @@ namespace tremotesf {
 
     private:
         void update(std::span<const int> changed);
-        void createTree();
+        Coroutine<> createTree();
         void resetTree();
         void updateTree(std::span<const int> changed);
 
@@ -54,6 +55,7 @@ namespace tremotesf {
         std::vector<TorrentFilesModelFile*> mFiles{};
         bool mCreatingTree{};
         bool mLoaded{};
+        CoroutineScope mCoroutineScope{};
     };
 }
 

@@ -5,23 +5,24 @@
 #include "requestrouter.h"
 
 #include <optional>
-#include <utility>
 
-#include <QAuthenticator>
-#include <QFutureWatcher>
 #include <QJsonDocument>
 #include <QObject>
+#include <QNetworkAccessManager>
+#include <QNetworkRequest>
 #include <QNetworkReply>
 #include <QSslSocket>
-#include <QtConcurrentRun>
 
 #include <fmt/chrono.h>
 #include <fmt/ranges.h>
 
+#include "coroutines/network.h"
+#include "coroutines/threadpool.h"
 #include "log/log.h"
+#include "literals.h"
+#include "pragmamacros.h"
+#include "rpc.h"
 
-SPECIALIZE_FORMATTER_FOR_Q_ENUM(QNetworkReply::NetworkError)
-SPECIALIZE_FORMATTER_FOR_Q_ENUM(QSslError::SslError)
 SPECIALIZE_FORMATTER_FOR_QDEBUG(QJsonObject)
 SPECIALIZE_FORMATTER_FOR_QDEBUG(QNetworkProxy)
 SPECIALIZE_FORMATTER_FOR_QDEBUG(QSslError)
@@ -29,8 +30,9 @@ SPECIALIZE_FORMATTER_FOR_QDEBUG(QSslError)
 namespace fmt {
     template<>
     struct formatter<QSsl::SslProtocol> : tremotesf::SimpleFormatter {
-        fmt::format_context::iterator format(QSsl::SslProtocol protocol, fmt::format_context& ctx) FORMAT_CONST {
+        fmt::format_context::iterator format(QSsl::SslProtocol protocol, fmt::format_context& ctx) const {
             const auto str = [&]() -> std::optional<std::string_view> {
+                SUPPRESS_DEPRECATED_WARNINGS_BEGIN
                 switch (protocol) {
                 case QSsl::TlsV1_0:
                     return "TlsV1_0";
@@ -71,6 +73,7 @@ namespace fmt {
                     return "TlsV1SslV3";
 #endif
                 }
+                SUPPRESS_DEPRECATED_WARNINGS_END
                 return std::nullopt;
             }();
             if (str) {
@@ -86,11 +89,13 @@ namespace fmt {
 }
 
 namespace tremotesf::impl {
+    struct NetworkReplyDeleter {
+        inline void operator()(QNetworkReply* reply) { reply->deleteLater(); }
+    };
+
     namespace {
         const auto sessionIdHeader = QByteArrayLiteral("X-Transmission-Session-Id");
         const auto authorizationHeader = QByteArrayLiteral("Authorization");
-
-        constexpr auto metadataProperty = "tremotesf::impl::RequestRouter metadata";
 
         QJsonObject getReplyArguments(const QJsonObject& parseResult) {
             return parseResult.value("arguments"_l1).toObject();
@@ -100,13 +105,75 @@ namespace tremotesf::impl {
             return (parseResult.value("result"_l1).toString() == "success"_l1);
         }
 
-        using ParseFutureWatcher = QFutureWatcher<std::optional<QJsonObject>>;
+        QString httpStatus(QNetworkReply* reply) {
+            const auto statusCodeAttr = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+            if (!statusCodeAttr.isValid()) {
+                return {};
+            }
+            auto status = QString::number(statusCodeAttr.toInt());
+            const auto reasonAttr = reply->attribute(QNetworkRequest::HttpReasonPhraseAttribute);
+            if (!reasonAttr.isValid()) {
+                return status;
+            }
+            const auto reason = QString::fromUtf8(reasonAttr.toByteArray());
+            if (reason.isEmpty()) {
+                return status;
+            }
+            status += ' ';
+            status += reason;
+            return status;
+        }
+
+        QString makeDetailedErrorMessage(QNetworkReply* reply, const QList<QSslError>& sslErrors) {
+            auto detailedErrorMessage =
+                QString::fromStdString(fmt::format("{}: {}", reply->error(), reply->errorString()));
+            if (reply->url() == reply->request().url()) {
+                detailedErrorMessage += QString::fromStdString(fmt::format("\nURL: {}", reply->url().toString()));
+            } else {
+                detailedErrorMessage += QString::fromStdString(fmt::format(
+                    "\nOriginal URL: {}\nRedirected URL: {}",
+                    reply->request().url().toString(),
+                    reply->url().toString()
+                ));
+            }
+            if (const auto status = httpStatus(reply); !status.isEmpty()) {
+                detailedErrorMessage += QString::fromStdString(fmt::format(
+                    "\nHTTP status: {}\nConnection was encrypted: {}",
+                    status,
+                    reply->attribute(QNetworkRequest::ConnectionEncryptedAttribute).toBool()
+                ));
+                if (!reply->rawHeaderPairs().isEmpty()) {
+                    detailedErrorMessage += "\nReply headers:"_l1;
+                    for (const QNetworkReply::RawHeaderPair& pair : reply->rawHeaderPairs()) {
+                        detailedErrorMessage +=
+                            QString::fromStdString(fmt::format("\n  {}: {}", pair.first, pair.second));
+                    }
+                }
+            } else {
+                detailedErrorMessage += "\nDid not establish HTTP connection"_l1;
+            }
+            if (!sslErrors.isEmpty()) {
+                detailedErrorMessage += QString::fromStdString(fmt::format("\n\n{} TLS errors:", sslErrors.size()));
+                int i = 1;
+                for (const QSslError& sslError : sslErrors) {
+                    detailedErrorMessage += QString::fromStdString(fmt::format(
+                        "\n\n {}. {}: {} on certificate:\n - {}",
+                        i,
+                        sslError.error(),
+                        sslError.errorString(),
+                        sslError.certificate().toText()
+                    ));
+                    ++i;
+                }
+            }
+            return detailedErrorMessage;
+        }
+
+        QNetworkRequest takeRequest(NetworkReplyUniquePtr reply) { return reply->request(); }
     }
 
     struct RpcRequestMetadata {
         QLatin1String method{};
-        RequestRouter::RequestType type{};
-        std::function<void(RequestRouter::Response)> onResponse{};
     };
 
     struct NetworkRequestMetadata {
@@ -118,14 +185,12 @@ namespace tremotesf::impl {
     RequestRouter::RequestRouter(QThreadPool* threadPool, QObject* parent)
         : QObject(parent),
           mNetwork(new QNetworkAccessManager(this)),
-          mThreadPool(threadPool ? threadPool : QThreadPool::globalInstance()) {
-        mNetwork->setAutoDeleteReplies(true);
-    }
+          mThreadPool(threadPool ? threadPool : QThreadPool::globalInstance()) {}
 
     RequestRouter::RequestRouter(QObject* parent) : RequestRouter(nullptr, parent) {}
 
     void RequestRouter::setConfiguration(RequestsConfiguration configuration) {
-        logDebug("Setting requests configuration");
+        debug().log("Setting requests configuration");
 
         mConfiguration = std::move(configuration);
 
@@ -152,13 +217,13 @@ namespace tremotesf::impl {
         }
 
         if (!mConfiguration->serverUrl.isEmpty()) {
-            logDebug("Connection configuration:");
-            logDebug(" - Server url: {}", mConfiguration->serverUrl.toString());
+            debug().log("Connection configuration:");
+            debug().log(" - Server url: {}", mConfiguration->serverUrl.toString());
             if (mConfiguration->proxy.type() != QNetworkProxy::NoProxy) {
-                logDebug(" - Proxy: {}", mConfiguration->proxy);
+                debug().log(" - Proxy: {}", mConfiguration->proxy);
             }
-            logDebug(" - Timeout: {}", mConfiguration->timeout);
-            logDebug(" - HTTP Basic access authentication: {}", mConfiguration->authentication);
+            debug().log(" - Timeout: {}", mConfiguration->timeout);
+            debug().log(" - HTTP Basic access authentication: {}", mConfiguration->authentication);
             if (mConfiguration->authentication) {
                 auto base64Credentials = QString("%1:%2")
                                              .arg(mConfiguration->username, mConfiguration->password)
@@ -169,16 +234,16 @@ namespace tremotesf::impl {
             }
             if (https) {
 #if QT_VERSION_MAJOR >= 6
-                logDebug(" - Available TLS backends: {}", QSslSocket::availableBackends());
-                logDebug(" - Active TLS backend: {}", QSslSocket::activeBackend());
-                logDebug(" - Supported TLS protocols: {}", QSslSocket::supportedProtocols());
+                debug().log(" - Available TLS backends: {}", QSslSocket::availableBackends());
+                debug().log(" - Active TLS backend: {}", QSslSocket::activeBackend());
+                debug().log(" - Supported TLS protocols: {}", QSslSocket::supportedProtocols());
 #endif
-                logDebug(" - TLS library version: {}", QSslSocket::sslLibraryVersionString());
-                logDebug(
+                debug().log(" - TLS library version: {}", QSslSocket::sslLibraryVersionString());
+                debug().log(
                     " - Manually validating server's certificate chain: {}",
                     !mConfiguration->serverCertificateChain.isEmpty()
                 );
-                logDebug(
+                debug().log(
                     " - Client certificate authentication: {}",
                     !mConfiguration->clientCertificate.isNull() && !mConfiguration->clientPrivateKey.isNull()
                 );
@@ -187,138 +252,91 @@ namespace tremotesf::impl {
     }
 
     void RequestRouter::resetConfiguration() {
-        logDebug("Resetting requests configuration");
+        debug().log("Resetting requests configuration");
         mConfiguration.reset();
         mNetwork->clearAccessCache();
     }
 
-    void RequestRouter::postRequest(
-        QLatin1String method, const QJsonObject& arguments, RequestType type, std::function<void(Response)>&& onResponse
-    ) {
-        postRequest(method, makeRequestData(method, arguments), type, std::move(onResponse));
+    Coroutine<RequestRouter::Response> RequestRouter::postRequest(QLatin1String method, QJsonObject arguments) {
+        co_return co_await postRequest(method, makeRequestData(method, arguments));
     }
 
-    void RequestRouter::postRequest(
-        QLatin1String method, const QByteArray& data, RequestType type, std::function<void(Response)>&& onResponse
-    ) {
+    Coroutine<RequestRouter::Response> RequestRouter::postRequest(QLatin1String method, QByteArray data) {
         if (!mConfiguration.has_value()) {
-            logWarning("Requests configuration is not set");
-            return;
+            throw std::runtime_error("Requests configuration is not set");
         }
 
         QNetworkRequest request(mConfiguration->serverUrl);
         request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json"_l1);
-        request.setSslConfiguration(mSslConfiguration);
-        request.setTransferTimeout(static_cast<int>(mConfiguration->timeout.count()));
-        NetworkRequestMetadata metadata{};
-        metadata.postData = data;
-        metadata.rpcMetadata = {method, type, std::move(onResponse)};
-        postRequest(request, metadata);
-    }
-
-    bool RequestRouter::hasPendingDataUpdateRequests() const {
-        return std::any_of(
-                   mPendingNetworkRequests.begin(),
-                   mPendingNetworkRequests.end(),
-                   [](const auto* reply) {
-                       const auto metadata = reply->property(metadataProperty).template value<NetworkRequestMetadata>();
-                       return metadata.rpcMetadata.type == RequestType::DataUpdate;
-                   }
-               ) ||
-               std::any_of(mPendingParseFutures.begin(), mPendingParseFutures.end(), [](const auto* future) {
-                   const auto metadata = future->property(metadataProperty).template value<RpcRequestMetadata>();
-                   return metadata.type == RequestType::DataUpdate;
-               });
-    }
-
-    void RequestRouter::cancelPendingRequestsAndClearSessionId() {
-        for (QNetworkReply* reply : std::unordered_set(std::move(mPendingNetworkRequests))) {
-            reply->abort();
-        }
-        for (QObject* futureWatcher : std::unordered_set(std::move(mPendingParseFutures))) {
-            static_cast<ParseFutureWatcher*>(futureWatcher)->cancel();
-            futureWatcher->deleteLater();
-        }
-        mSessionId.clear();
-    }
-
-    QByteArray RequestRouter::makeRequestData(const QString& method, const QJsonObject& arguments) {
-        return QJsonDocument(QJsonObject{
-                                 {QStringLiteral("method"), method},
-                                 {QStringLiteral("arguments"), arguments},
-                             })
-            .toJson(QJsonDocument::Compact);
-    }
-
-    void RequestRouter::postRequest(QNetworkRequest request, const NetworkRequestMetadata& metadata) {
-        if (!mSessionId.isEmpty()) {
-            request.setRawHeader(sessionIdHeader, mSessionId);
-        }
         // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         if (mConfiguration->authentication) {
             request.setRawHeader(authorizationHeader, mAuthorizationHeaderValue);
         }
-        QNetworkReply* reply = mNetwork->post(request, metadata.postData);
-        reply->setProperty(metadataProperty, QVariant::fromValue(metadata));
-        mPendingNetworkRequests.insert(reply);
+        request.setSslConfiguration(mSslConfiguration);
+        request.setTransferTimeout(
+            static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(mConfiguration->timeout).count())
+        );
+        NetworkRequestMetadata metadata{};
+        metadata.postData = data;
+        metadata.rpcMetadata = {method};
+        co_return co_await performRequest(request, metadata);
+    }
 
-        reply->ignoreSslErrors(mExpectedSslErrors);
+    void RequestRouter::abortNetworkRequestsAndClearSessionId() {
+        auto children = mNetwork->children();
+        for (auto* child : children) {
+            if (auto* reply = qobject_cast<QNetworkReply*>(child); reply && reply->isRunning()) {
+                reply->abort();
+            }
+        }
+        mNetwork->clearConnectionCache();
+        mSessionId.clear();
+    }
+
+    QByteArray RequestRouter::makeRequestData(QLatin1String method, QJsonObject arguments) {
+        return QJsonDocument(QJsonObject{
+                                 {QStringLiteral("method"), QJsonValue(QString(method))},
+                                 {QStringLiteral("arguments"), QJsonValue(std::move(arguments))},
+                             })
+            .toJson(QJsonDocument::Compact);
+    }
+
+    Coroutine<RequestRouter::Response>
+    RequestRouter::performRequest(QNetworkRequest request, NetworkRequestMetadata metadata) {
+        if (!mSessionId.isEmpty()) {
+            request.setRawHeader(sessionIdHeader, mSessionId);
+        }
+        NetworkReplyUniquePtr reply(mNetwork->post(request, metadata.postData));
+
+        auto expectedSslErrors = mExpectedSslErrors;
+        reply->ignoreSslErrors(expectedSslErrors);
         auto sslErrors = std::make_shared<QList<QSslError>>();
-
-        QObject::connect(reply, &QNetworkReply::sslErrors, this, [=, this](const QList<QSslError>& errors) {
+        QObject::connect(reply.get(), &QNetworkReply::sslErrors, reply.get(), [=](const QList<QSslError>& errors) {
             for (const QSslError& error : errors) {
-                if (!mExpectedSslErrors.contains(error)) {
+                if (!expectedSslErrors.contains(error)) {
                     sslErrors->push_back(error);
                 }
             }
         });
-
-        QObject::connect(reply, &QNetworkReply::finished, this, [=, this]() mutable {
-            onRequestFinished(reply, *sslErrors);
-        });
-    }
-
-    bool RequestRouter::retryRequest(const QNetworkRequest& request, NetworkRequestMetadata metadata) {
-        if (!mConfiguration.has_value()) {
-            logWarning("Not retrying request, requests configuration is not set");
-            return false;
-        }
-        metadata.retryAttempts++;
-        if (metadata.retryAttempts > mConfiguration->retryAttempts) {
-            return false;
-        }
-        logWarning("Retrying '{}' request, retry attempts = {}", metadata.rpcMetadata.method, metadata.retryAttempts);
-        postRequest(request, metadata);
-        return true;
-    }
-
-    void RequestRouter::onRequestFinished(QNetworkReply* reply, const QList<QSslError>& sslErrors) {
-        if (mPendingNetworkRequests.erase(reply) == 0) {
-            // Request was cancelled
-            return;
-        }
-        const auto metadata = reply->property(metadataProperty).value<NetworkRequestMetadata>();
+        co_await *reply;
         if (reply->error() == QNetworkReply::NoError) {
-            onRequestSuccess(reply, metadata.rpcMetadata);
+            co_return co_await onRequestSuccess(std::move(reply), metadata.rpcMetadata);
         } else {
-            onRequestError(reply, sslErrors, metadata);
+            co_return co_await onRequestError(std::move(reply), *sslErrors, metadata);
         }
     }
 
-    void RequestRouter::onRequestSuccess(QNetworkReply* reply, const RpcRequestMetadata& metadata) {
-        logDebug(
-            "HTTP request for method '{}' succeeded, HTTP status code: {} {}",
-            metadata.method,
-            reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt(),
-            reply->attribute(QNetworkRequest::HttpReasonPhraseAttribute).toString()
-        );
-
-        const auto future =
-            QtConcurrent::run(mThreadPool, [replyData = reply->readAll()]() -> std::optional<QJsonObject> {
+    Coroutine<RequestRouter::Response>
+    RequestRouter::onRequestSuccess(NetworkReplyUniquePtr reply, RpcRequestMetadata metadata) {
+        debug()
+            .log("HTTP request for method '{}' succeeded, HTTP status: {}", metadata.method, httpStatus(reply.get()));
+        const auto json = co_await runOnThreadPool(
+            [](NetworkReplyUniquePtr reply) -> std::optional<QJsonObject> {
+                const auto replyData = reply->readAll();
                 QJsonParseError error{};
                 QJsonObject json = QJsonDocument::fromJson(replyData, &error).object();
                 if (error.error != QJsonParseError::NoError) {
-                    logWarning(
+                    warning().log(
                         "Failed to parse JSON reply from server:\n{}\nError '{}' at offset {}",
                         replyData,
                         error.errorString(),
@@ -327,34 +345,22 @@ namespace tremotesf::impl {
                     return {};
                 }
                 return json;
-            });
-        auto watcher = new ParseFutureWatcher(this);
-        watcher->setProperty(metadataProperty, QVariant::fromValue(metadata));
-        QObject::connect(watcher, &ParseFutureWatcher::finished, this, [=, this] {
-            if (!mPendingParseFutures.erase(watcher)) {
-                // Future was cancelled
-                return;
-            }
-            auto json = watcher->result();
-            if (json.has_value()) {
-                const bool success = isResultSuccessful(*json);
-                if (!success) {
-                    logWarning("method '{}' failed, response: {}", metadata.method, *json);
-                }
-                if (metadata.onResponse) {
-                    metadata.onResponse({.arguments = getReplyArguments(*json), .success = success});
-                }
-            } else {
-                emit requestFailed(RpcError::ParseError, {}, {});
-            }
-            watcher->deleteLater();
-        });
-        mPendingParseFutures.insert(watcher);
-        watcher->setFuture(future);
+            },
+            std::move(reply)
+        );
+        if (!json.has_value()) {
+            emit requestFailed(RpcError::ParseError, {}, {});
+            cancelCoroutine();
+        }
+        const bool success = isResultSuccessful(*json);
+        if (!success) {
+            warning().log("method '{}' failed, response: {}", metadata.method, *json);
+        }
+        co_return Response{.arguments = getReplyArguments(*json), .success = success};
     }
 
-    void RequestRouter::onRequestError(
-        QNetworkReply* reply, const QList<QSslError>& sslErrors, const NetworkRequestMetadata& metadata
+    Coroutine<RequestRouter::Response> RequestRouter::onRequestError(
+        NetworkReplyUniquePtr reply, QList<QSslError> sslErrors, NetworkRequestMetadata metadata
     ) {
         if (reply->error() == QNetworkReply::ContentConflictError && reply->hasRawHeader(sessionIdHeader)) {
             QByteArray newSessionId = reply->rawHeader(sessionIdHeader);
@@ -362,83 +368,46 @@ namespace tremotesf::impl {
             // to handle case when current session id have already been overwritten by another failed request
             if (newSessionId != reply->request().rawHeader(sessionIdHeader)) {
                 if (!mSessionId.isEmpty()) {
-                    logInfo("Session id changed");
+                    info().log("Session id changed");
                 }
-                logDebug("Session id is {}, retrying '{}' request", newSessionId, metadata.rpcMetadata.method);
+                debug().log("Session id is {}, retrying '{}' request", newSessionId, metadata.rpcMetadata.method);
                 mSessionId = std::move(newSessionId);
                 // Retry without incrementing retryAttempts
-                postRequest(reply->request(), metadata);
-                return;
+                co_return co_await performRequest(takeRequest(std::move(reply)), metadata);
             }
         }
 
-        const QString detailedErrorMessage = makeDetailedErrorMessage(reply, sslErrors);
-        logWarning("HTTP request for method '{}' failed:\n{}", metadata.rpcMetadata.method, detailedErrorMessage);
+        const QString detailedErrorMessage = makeDetailedErrorMessage(reply.get(), sslErrors);
+        warning().log("HTTP request for method '{}' failed:\n{}", metadata.rpcMetadata.method, detailedErrorMessage);
+
+        RpcError error{};
+        bool shouldRetry{};
         switch (reply->error()) {
         case QNetworkReply::AuthenticationRequiredError:
-            logWarning("Authentication error");
-            emit requestFailed(RpcError::AuthenticationError, reply->errorString(), detailedErrorMessage);
+            warning().log("Authentication error");
+            error = RpcError::AuthenticationError;
+            shouldRetry = false;
             break;
         case QNetworkReply::OperationCanceledError:
         case QNetworkReply::TimeoutError:
-            logWarning("Timed out");
-            if (!retryRequest(reply->request(), metadata)) {
-                emit requestFailed(RpcError::TimedOut, reply->errorString(), detailedErrorMessage);
-            }
+            warning().log("Timed out");
+            error = RpcError::TimedOut;
+            shouldRetry = true;
             break;
-        default: {
-            if (!retryRequest(reply->request(), metadata)) {
-                emit requestFailed(RpcError::ConnectionError, reply->errorString(), detailedErrorMessage);
-            }
+        default:
+            error = RpcError::ConnectionError;
+            shouldRetry = true;
+            break;
         }
-        }
-    }
 
-    QString RequestRouter::makeDetailedErrorMessage(QNetworkReply* reply, const QList<QSslError>& sslErrors) {
-        auto detailedErrorMessage = QString::fromStdString(fmt::format("{}: {}", reply->error(), reply->errorString()));
-        if (reply->url() == reply->request().url()) {
-            detailedErrorMessage += QString::fromStdString(fmt::format("\nURL: {}", reply->url().toString()));
-        } else {
-            detailedErrorMessage += QString::fromStdString(fmt::format(
-                "\nOriginal URL: {}\nRedirected URL: {}",
-                reply->request().url().toString(),
-                reply->url().toString()
-            ));
+        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+        if (shouldRetry && metadata.retryAttempts < mConfiguration.value().retryAttempts) {
+            metadata.retryAttempts++;
+            warning()
+                .log("Retrying '{}' request, retry attempts = {}", metadata.rpcMetadata.method, metadata.retryAttempts);
+            co_return co_await performRequest(takeRequest(std::move(reply)), metadata);
         }
-        if (auto httpStatusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
-            httpStatusCode.isValid()) {
-            detailedErrorMessage += QString::fromStdString(fmt::format(
-                "\nHTTP status code: {} {}\nConnection was encrypted: {}",
-                httpStatusCode.toInt(),
-                reply->attribute(QNetworkRequest::HttpReasonPhraseAttribute).toString(),
-                reply->attribute(QNetworkRequest::ConnectionEncryptedAttribute).toBool()
-            ));
-            if (!reply->rawHeaderPairs().isEmpty()) {
-                detailedErrorMessage += "\nReply headers:"_l1;
-                for (const QNetworkReply::RawHeaderPair& pair : reply->rawHeaderPairs()) {
-                    detailedErrorMessage += QString::fromStdString(fmt::format("\n  {}: {}", pair.first, pair.second));
-                }
-            }
-        } else {
-            detailedErrorMessage += "\nDid not establish HTTP connection"_l1;
-        }
-        if (!sslErrors.isEmpty()) {
-            detailedErrorMessage += QString::fromStdString(fmt::format("\n\n{} TLS errors:", sslErrors.size()));
-            int i = 1;
-            for (const QSslError& sslError : sslErrors) {
-                detailedErrorMessage += QString::fromStdString(fmt::format(
-                    "\n\n {}. {}: {} on certificate:\n - {}",
-                    i,
-                    sslError.error(),
-                    sslError.errorString(),
-                    sslError.certificate().toText()
-                ));
-                ++i;
-            }
-        }
-        return detailedErrorMessage;
+        emit requestFailed(error, reply->errorString(), detailedErrorMessage);
+        cancelCoroutine();
     }
 }
-
-Q_DECLARE_METATYPE(tremotesf::impl::RpcRequestMetadata)
-Q_DECLARE_METATYPE(tremotesf::impl::NetworkRequestMetadata)

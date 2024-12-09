@@ -15,33 +15,28 @@
 
 #include "log/log.h"
 #include "literals.h"
-#include "target_os.h"
 
 SPECIALIZE_FORMATTER_FOR_QDEBUG(QUrl)
 
 namespace tremotesf {
     namespace impl {
-        void FileManagerLauncher::launchFileManagerAndSelectFiles(
-            const std::vector<QString>& files, const QPointer<QWidget>& parentWidget
-        ) {
+        void
+        FileManagerLauncher::launchFileManagerAndSelectFiles(const std::vector<QString>& files, QWidget* parentWidget) {
             std::vector<FilesInDirectory> filesToSelect{};
             std::vector<QString> nonExistentDirectories{};
             for (const QString& filePath : files) {
                 QString dirPath = QFileInfo(filePath).path();
 
-                if (std::find(nonExistentDirectories.begin(), nonExistentDirectories.end(), dirPath) !=
-                    nonExistentDirectories.end()) {
+                if (std::ranges::find(nonExistentDirectories, dirPath) != nonExistentDirectories.end()) {
                     continue;
                 }
                 if (!QFileInfo::exists(dirPath)) {
-                    logWarning("FileManagerLauncher: directory {} does not exist", dirPath);
+                    warning().log("FileManagerLauncher: directory {} does not exist", dirPath);
                     nonExistentDirectories.push_back(dirPath);
                     continue;
                 }
 
-                const auto found = std::find_if(filesToSelect.begin(), filesToSelect.end(), [&](const auto& d) {
-                    return d.directory == dirPath;
-                });
+                const auto found = std::ranges::find(filesToSelect, dirPath, &FilesInDirectory::directory);
                 auto& dirFiles = [&]() -> std::vector<QString>& {
                     if (found != filesToSelect.end()) {
                         return found->files;
@@ -67,8 +62,7 @@ namespace tremotesf {
         void FileManagerLauncher::launchFileManagerAndSelectFiles(
             // NOLINTNEXTLINE(performance-unnecessary-value-param)
             std::vector<FilesInDirectory> filesToSelect,
-            // NOLINTNEXTLINE(performance-unnecessary-value-param)
-            QPointer<QWidget> parentWidget
+            QWidget* parentWidget
         ) {
             for (const auto& [directory, _] : filesToSelect) {
                 fallbackForDirectory(directory, parentWidget);
@@ -78,9 +72,9 @@ namespace tremotesf {
 
         void FileManagerLauncher::fallbackForDirectory(const QString& dirPath, QWidget* parentWidget) {
             const auto url = QUrl::fromLocalFile(dirPath);
-            logInfo("FileManagerLauncher: executing QDesktopServices::openUrl() for {}", url);
+            info().log("FileManagerLauncher: executing QDesktopServices::openUrl() for {}", url);
             if (!QDesktopServices::openUrl(url)) {
-                logWarning("FileManagerLauncher: QDesktopServices::openUrl() failed for {}", url);
+                warning().log("FileManagerLauncher: QDesktopServices::openUrl() failed for {}", url);
                 showErrorDialog(dirPath, {}, parentWidget);
             }
         }

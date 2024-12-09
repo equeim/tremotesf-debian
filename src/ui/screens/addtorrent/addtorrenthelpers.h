@@ -7,7 +7,11 @@
 
 #include <QString>
 
+#include "bencodeparser.h"
 #include "rpc/torrent.h"
+
+class QDialog;
+class QWidget;
 
 namespace tremotesf {
     class Rpc;
@@ -24,6 +28,10 @@ namespace tremotesf {
     AddTorrentParameters getInitialAddTorrentParameters(Rpc* rpc);
 
     void deleteTorrentFile(const QString& filePath, bool moveToTrash);
+
+    QDialog* askForMergingTrackers(Torrent* torrent, std::vector<std::set<QString>> trackers, QWidget* parent);
+
+    QString bencodeErrorString(bencode::Error::Type type);
 }
 
 #endif // TREMOTESF_ADDTORRENTHELPERS_H

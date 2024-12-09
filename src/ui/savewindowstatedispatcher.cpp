@@ -5,14 +5,13 @@
 #include "savewindowstatedispatcher.h"
 
 #include <functional>
+
 #include <QApplication>
 #include <QWidget>
 
 #include "settings.h"
 #include "log/log.h"
 #include "rpc/servers.h"
-
-SPECIALIZE_FORMATTER_FOR_Q_ENUM(QEvent::Type)
 
 namespace tremotesf {
     namespace {
@@ -35,30 +34,32 @@ namespace tremotesf {
     }
 
     void SaveWindowStateDispatcher::onAboutToQuit() {
-        logDebug("Received aboutToQuit signal");
+        debug().log("Received aboutToQuit signal");
         for (QWidget* window : QApplication::topLevelWidgets()) {
             if (window->property(windowHasSaveStateHandlerProperty).toBool()) {
-                logDebug("Sending save state event to window {}", *window);
+                debug().log("Sending save state event to window {}", *window);
                 QEvent event(saveStateOnQuitEventType());
                 QCoreApplication::sendEvent(window, &event);
             }
         }
         // On Windows our process might be terminated immediately after returning from this function
         // and QSettings destructors won't be called, so sync them immediately
-        logDebug("Syncing settings");
+        debug().log("Syncing settings");
         Settings::instance()->sync();
         Servers::instance()->sync();
     }
 
 #if QT_VERSION_MAJOR >= 6
+    ApplicationQuitEventFilter::ApplicationQuitEventFilter(QObject* parent) : QObject(parent) {
+        qApp->installEventFilter(this);
+    }
+
+    ApplicationQuitEventFilter::~ApplicationQuitEventFilter() { qApp->removeEventFilter(this); }
+
     bool ApplicationQuitEventFilter::eventFilter(QObject*, QEvent* event) {
         if (event->type() == QEvent::Quit) {
             isQuittingApplication = true;
-            QMetaObject::invokeMethod(
-                qApp,
-                [this] { isQuittingApplication = false; },
-                Qt::QueuedConnection
-            );
+            QMetaObject::invokeMethod(qApp, [this] { isQuittingApplication = false; }, Qt::QueuedConnection);
         }
         return false;
     }
@@ -72,7 +73,7 @@ namespace tremotesf {
 
     SaveWindowStateHandler::~SaveWindowStateHandler() {
         mWindow->removeEventFilter(this);
-        mWindow->setProperty(windowHasSaveStateHandlerProperty, QVariant::Invalid);
+        mWindow->setProperty(windowHasSaveStateHandlerProperty, QVariant{});
     }
 
     bool SaveWindowStateHandler::eventFilter(QObject* watched, QEvent* event) {
@@ -81,22 +82,22 @@ namespace tremotesf {
         switch (event->type()) {
         case QEvent::WindowDeactivate:
         case QEvent::Hide:
-            logDebug("Received {} event for {}", event->type(), *window);
+            debug().log("Received {} event for {}", event->type(), *window);
 #if QT_VERSION_MAJOR >= 6
             if (mApplicationEventFilter.isQuittingApplication) {
-                logDebug("Already quitting application, ignore");
+                debug().log("Already quitting application, ignore");
                 break;
             }
 #endif
             if (event->type() == QEvent::WindowDeactivate && window->isHidden()) {
-                logDebug("Window is hidden, ignore");
+                debug().log("Window is hidden, ignore");
                 break;
             }
             mSaveState();
             break;
         default:
             if (event->type() == saveStateOnQuitEventType()) {
-                logDebug("Received save state event for {}", *window);
+                debug().log("Received save state event for {}", *window);
                 mSaveState();
             }
             break;

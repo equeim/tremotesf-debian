@@ -24,9 +24,6 @@
 #include "windowshelpers.h"
 #include "systemcolorsprovider.h"
 
-SPECIALIZE_FORMATTER_FOR_Q_ENUM(QEvent::Type)
-SPECIALIZE_FORMATTER_FOR_Q_ENUM(Qt::WindowType)
-
 namespace tremotesf {
 
     namespace {
@@ -48,11 +45,12 @@ namespace tremotesf {
             bool eventFilter(QObject* watched, QEvent* event) override {
                 switch (event->type()) {
                 case QEvent::WinIdChange: {
-                    auto window = qobject_cast<QWindow*>(watched);
-                    if (!window) {
-                        if (auto widget = qobject_cast<QWidget*>(watched); widget) {
-                            window = widget->windowHandle();
-                        }
+                    // Using QWindow::winId instead of QWidget::winId directly because
+                    // QWidget::winId may create native window prematurely which we don't want
+                    // QWidget::windowHandle will return nullptr if native window doesn't exist yet so we check for that
+                    QWindow* window{};
+                    if (auto widget = qobject_cast<QWidget*>(watched); widget) {
+                        window = widget->windowHandle();
                     }
                     if (window) {
                         switch (window->type()) {
@@ -93,7 +91,7 @@ namespace tremotesf {
 
             void applyDarkThemeToTitleBar(QWindow* window) {
                 if (isRunningOnWindows11OrGreater()) {
-                    logInfo("Setting DWMWA_CAPTION_COLOR on {}", *window);
+                    debug().log("Setting DWMWA_CAPTION_COLOR on {}", *window);
                     const auto qcolor = QGuiApplication::palette().color(QPalette::Window);
                     const auto color = RGB(qcolor.red(), qcolor.green(), qcolor.blue());
                     try {
@@ -107,10 +105,10 @@ namespace tremotesf {
                             "DwmSetWindowAttribute"
                         );
                     } catch (const winrt::hresult_error& e) {
-                        logWarningWithException(e, "Failed to set DWMWA_CAPTION_COLOR on {}", *window);
+                        warning().logWithException(e, "Failed to set DWMWA_CAPTION_COLOR on {}", *window);
                     }
                 } else {
-                    logInfo("Setting DWMWA_USE_IMMERSIVE_DARK_MODE on {}", *window);
+                    debug().log("Setting DWMWA_USE_IMMERSIVE_DARK_MODE on {}", *window);
                     const auto attribute = []() -> DWORD {
                         if (isRunningOnWindows10_2004OrGreater()) {
                             return DWMWINDOWATTRIBUTE_compat::DWMWA_USE_IMMERSIVE_DARK_MODE_SINCE_2004;
@@ -140,7 +138,7 @@ namespace tremotesf {
                             "DwmSetWindowAttribute"
                         );
                     } catch (const winrt::hresult_error& e) {
-                        logWarningWithException(e, "Failed to set DWMWA_USE_IMMERSIVE_DARK_MODE on {}", *window);
+                        warning().logWithException(e, "Failed to set DWMWA_USE_IMMERSIVE_DARK_MODE on {}", *window);
                     }
                 }
             }
@@ -263,7 +261,7 @@ namespace tremotesf {
             palette.setColor(QPalette::Link, link);
             palette.setColor(QPalette::LinkVisited, link.darker());
 
-            logInfo("applyDarkThemeToPalette: setting application palette");
+            info().log("applyDarkThemeToPalette: setting application palette");
             QGuiApplication::setPalette(palette);
 
             QPalette toolTipPalette{QToolTip::palette()};

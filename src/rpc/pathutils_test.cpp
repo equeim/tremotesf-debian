@@ -7,8 +7,6 @@
 
 #include "pathutils.h"
 
-// NOLINTBEGIN(cppcoreguidelines-avoid-do-while)
-
 using namespace tremotesf;
 
 class PathUtilsTest final : public QObject {
@@ -66,7 +64,7 @@ private slots:
             NormalizeTestCase{R"(C:\home\fo o)", "C:/home/fo o", PathOs::Windows},
 
             // Weird cases from the top of my head
-            NormalizeTestCase{"d:", "D:", PathOs::Windows},
+            NormalizeTestCase{"d:", "D:/", PathOs::Windows},
             NormalizeTestCase{"d:foo", "D:foo", PathOs::Windows},
             NormalizeTestCase{R"(c::\wtf)", R"(C::/wtf)", PathOs::Windows}
         };

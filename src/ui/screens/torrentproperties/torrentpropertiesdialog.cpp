@@ -37,6 +37,7 @@
 #include "rpc/pathutils.h"
 #include "rpc/rpc.h"
 #include "rpc/torrent.h"
+#include "rpc/serversettings.h"
 #include "ui/itemmodels/baseproxymodel.h"
 #include "ui/itemmodels/stringlistmodel.h"
 #include "ui/widgets/torrentfilesview.h"
@@ -635,7 +636,7 @@ namespace tremotesf {
     }
 
     void TorrentPropertiesDialog::saveState() {
-        logDebug("Saving TorrentPropertiesDialog state, window geometry is {}", geometry());
+        debug().log("Saving TorrentPropertiesDialog state, window geometry is {}", geometry());
         Settings::instance()->setTorrentPropertiesDialogGeometry(saveGeometry());
         Settings::instance()->setPeersViewHeaderState(mPeersView->header()->saveState());
         mFilesView->saveState();
