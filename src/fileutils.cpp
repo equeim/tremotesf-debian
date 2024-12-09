@@ -13,58 +13,63 @@
 #include <QStandardPaths>
 #include <QStringBuilder>
 
+#include <fmt/format.h>
+
 #include "literals.h"
 #include "macoshelpers.h"
 #include "target_os.h"
 #include "log/log.h"
 
 namespace fmt {
-    format_context::iterator formatter<QFile::FileError>::format(QFile::FileError e, format_context& ctx) FORMAT_CONST {
-        const std::string_view string = [e] {
-            using namespace std::string_view_literals;
-            switch (e) {
-            case QFileDevice::NoError:
-                return "NoError"sv;
-            case QFileDevice::ReadError:
-                return "ReadError"sv;
-            case QFileDevice::WriteError:
-                return "WriteError"sv;
-            case QFileDevice::FatalError:
-                return "FatalError"sv;
-            case QFileDevice::ResourceError:
-                return "ResourceError"sv;
-            case QFileDevice::OpenError:
-                return "OpenError"sv;
-            case QFileDevice::AbortError:
-                return "AbortError"sv;
-            case QFileDevice::TimeOutError:
-                return "TimeOutError"sv;
-            case QFileDevice::UnspecifiedError:
-                return "UnspecifiedError"sv;
-            case QFileDevice::RemoveError:
-                return "RemoveError"sv;
-            case QFileDevice::RenameError:
-                return "RenameError"sv;
-            case QFileDevice::PositionError:
-                return "PositionError"sv;
-            case QFileDevice::ResizeError:
-                return "ResizeError"sv;
-            case QFileDevice::PermissionsError:
-                return "PermissionsError"sv;
-            case QFileDevice::CopyError:
-                return "CopyError"sv;
+    template<>
+    struct formatter<QFile::FileError> : tremotesf::SimpleFormatter {
+        format_context::iterator format(QFile::FileError e, format_context& ctx) const {
+            const std::string_view string = [e] {
+                using namespace std::string_view_literals;
+                switch (e) {
+                case QFileDevice::NoError:
+                    return "NoError"sv;
+                case QFileDevice::ReadError:
+                    return "ReadError"sv;
+                case QFileDevice::WriteError:
+                    return "WriteError"sv;
+                case QFileDevice::FatalError:
+                    return "FatalError"sv;
+                case QFileDevice::ResourceError:
+                    return "ResourceError"sv;
+                case QFileDevice::OpenError:
+                    return "OpenError"sv;
+                case QFileDevice::AbortError:
+                    return "AbortError"sv;
+                case QFileDevice::TimeOutError:
+                    return "TimeOutError"sv;
+                case QFileDevice::UnspecifiedError:
+                    return "UnspecifiedError"sv;
+                case QFileDevice::RemoveError:
+                    return "RemoveError"sv;
+                case QFileDevice::RenameError:
+                    return "RenameError"sv;
+                case QFileDevice::PositionError:
+                    return "PositionError"sv;
+                case QFileDevice::ResizeError:
+                    return "ResizeError"sv;
+                case QFileDevice::PermissionsError:
+                    return "PermissionsError"sv;
+                case QFileDevice::CopyError:
+                    return "CopyError"sv;
+                }
+                return std::string_view{};
+            }();
+            if (string.empty()) {
+                return fmt::format_to(
+                    ctx.out(),
+                    "QFileDevice::FileError::<unnamed value {}>",
+                    static_cast<std::underlying_type_t<decltype(e)>>(e)
+                );
             }
-            return std::string_view{};
-        }();
-        if (string.empty()) {
-            return fmt::format_to(
-                ctx.out(),
-                "QFileDevice::FileError::<unnamed value {}>",
-                static_cast<std::underlying_type_t<decltype(e)>>(e)
-            );
+            return fmt::format_to(ctx.out(), "QFileDevice::FileError::{}", string);
         }
-        return fmt::format_to(ctx.out(), "QFileDevice::FileError::{}", string);
-    }
+    };
 }
 
 namespace tremotesf {
@@ -212,23 +217,23 @@ namespace tremotesf {
     }
 
     void deleteFile(const QString& path) {
-        logInfo("Deleting file {}", path);
+        info().log("Deleting file {}", path);
         QFile file(path);
         if (file.remove()) {
-            logInfo("Succesfully deleted file");
+            info().log("Succesfully deleted file");
         } else {
             throw QFileError(fmt::format("Failed to delete {}: {}", fileDescription(file), errorDescription(file)));
         }
     }
 
     void moveFileToTrash(const QString& path) {
-        logInfo("Moving file {} to trash", path);
+        info().log("Moving file {} to trash", path);
         QFile file(path);
         if (file.moveToTrash()) {
             if (const auto newPath = file.fileName(); !newPath.isEmpty()) {
-                logInfo("Successfully moved file to trash, new path is {}", newPath);
+                info().log("Successfully moved file to trash, new path is {}", newPath);
             } else {
-                logInfo("Successfully moved file to trash");
+                info().log("Successfully moved file to trash");
             }
         } else {
             throw QFileError(
@@ -293,13 +298,13 @@ namespace tremotesf {
         bool isTransmissionSessionIdFileExists(const QByteArray& sessionId) {
             const auto file = QStandardPaths::locate(sessionIdFileLocation, sessionIdFilePrefix % sessionId);
             if (!file.isEmpty()) {
-                logInfo(
+                info().log(
                     "isSessionIdFileExists: found transmission-daemon session id file {}",
                     QDir::toNativeSeparators(file)
                 );
                 return true;
             }
-            logInfo("isSessionIdFileExists: did not find transmission-daemon session id file");
+            info().log("isSessionIdFileExists: did not find transmission-daemon session id file");
             return false;
         }
     }

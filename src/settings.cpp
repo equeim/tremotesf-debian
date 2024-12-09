@@ -7,17 +7,15 @@
 #include "settings.h"
 
 #include <QCoreApplication>
-#include <QDataStream>
 #include <QMetaEnum>
 #include <QSettings>
 
+#if QT_VERSION_MAJOR < 6
+#    include <QDataStream>
+#endif
+
 #include "log/log.h"
 #include "target_os.h"
-
-SPECIALIZE_FORMATTER_FOR_Q_ENUM(Qt::ToolButtonStyle)
-SPECIALIZE_FORMATTER_FOR_Q_ENUM(tremotesf::TorrentsProxyModel::StatusFilter)
-SPECIALIZE_FORMATTER_FOR_Q_ENUM(tremotesf::Settings::DarkThemeMode)
-SPECIALIZE_FORMATTER_FOR_Q_ENUM(tremotesf::Settings::TorrentDoubleClickAction)
 
 #define SETTINGS_PROPERTY_DEF_IMPL(type, getter, setterType, setter, key, defaultValue)    \
     type Settings::getter() const { return getValue<type>(mSettings, key, defaultValue); } \
@@ -39,7 +37,7 @@ namespace tremotesf {
             if constexpr (std::is_enum_v<T>) {
                 const auto meta = QMetaEnum::fromType<T>();
                 if (!meta.valueToKey(static_cast<int>(value))) {
-                    logWarning("Settings: key {} has invalid value {}, returning default value", key, value);
+                    warning().log("Settings: key {} has invalid value {}, returning default value", key, value);
                     return defaultValue;
                 }
             }
@@ -133,6 +131,23 @@ namespace tremotesf {
     SETTINGS_PROPERTY_DEF_TRIVIAL(
         bool, isTorrentsStatusFilterEnabled, setTorrentsStatusFilterEnabled, "torrentsStatusFilterEnabled", true
     )
+
+    SETTINGS_PROPERTY_DEF_TRIVIAL(
+        bool,
+        mergeTrackersWhenAddingExistingTorrent,
+        setMergeTrackersWhenAddingExistingTorrent,
+        "mergeTrackersWhenAddingExistingTorrent",
+        false
+    )
+
+    SETTINGS_PROPERTY_DEF_TRIVIAL(
+        bool,
+        askForMergingTrackersWhenAddingExistingTorrent,
+        setAskForMergingTrackersWhenAddingExistingTorrent,
+        "askForMergingTrackersWhenAddingExistingTorrent",
+        true
+    )
+
     SETTINGS_PROPERTY_DEF_TRIVIAL(
         TorrentsProxyModel::StatusFilter,
         torrentsStatusFilter,

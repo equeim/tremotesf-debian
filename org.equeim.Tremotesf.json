@@ -1,7 +1,7 @@
 {
     "app-id": "org.equeim.Tremotesf",
     "runtime": "org.kde.Platform",
-    "runtime-version": "6.6",
+    "runtime-version": "6.8",
     "sdk": "org.kde.Sdk",
     "command": "tremotesf",
     "finish-args": [
@@ -11,7 +11,6 @@
         "--share=network",
         "--device=dri",
         "--filesystem=host:ro",
-        "--talk-name=org.freedesktop.Notifications",
         "--talk-name=org.kde.StatusNotifierWatcher",
         "--talk-name=org.freedesktop.FileManager1"
     ],
@@ -23,7 +22,7 @@
     ],
     "modules": [
         {
-            "name" : "fmt",
+            "name": "fmt",
             "buildsystem": "cmake-ninja",
             "builddir": true,
             "config-opts": [
@@ -32,16 +31,16 @@
                 "-DFMT_DOC=OFF",
                 "-DFMT_TEST=OFF"
             ],
-            "sources" : [
+            "sources": [
                 {
-                    "type" : "archive",
-                    "url" : "https://github.com/fmtlib/fmt/releases/download/10.2.1/fmt-10.2.1.zip",
-                    "sha256" : "312151a2d13c8327f5c9c586ac6cf7cddc1658e8f53edae0ec56509c8fa516c9"
+                    "type": "archive",
+                    "url": "https://github.com/fmtlib/fmt/releases/download/11.0.2/fmt-11.0.2.zip",
+                    "sha256": "40fc58bebcf38c759e11a7bd8fdc163507d2423ef5058bba7f26280c5b9c5465"
                 }
             ]
         },
         {
-            "name" : "cxxopts",
+            "name": "cxxopts",
             "buildsystem": "cmake-ninja",
             "builddir": true,
             "config-opts": [
@@ -50,16 +49,16 @@
                 "-DCXXOPTS_BUILD_EXAMPLES=OFF",
                 "-DCXXOPTS_BUILD_TESTS=OFF"
             ],
-            "sources" : [
+            "sources": [
                 {
-                    "type" : "archive",
-                    "url" : "https://github.com/jarro2783/cxxopts/archive/refs/tags/v3.2.1.tar.gz",
-                    "sha256" : "841f49f2e045b9c6365997c2a8fbf76e6f215042dda4511a5bb04bc5ebc7f88a"
+                    "type": "archive",
+                    "url": "https://github.com/jarro2783/cxxopts/archive/refs/tags/v3.2.1.tar.gz",
+                    "sha256": "841f49f2e045b9c6365997c2a8fbf76e6f215042dda4511a5bb04bc5ebc7f88a"
                 }
             ]
         },
         {
-            "name" : "cpp-httplib",
+            "name": "cpp-httplib",
             "buildsystem": "cmake-ninja",
             "builddir": true,
             "config-opts": [
@@ -67,11 +66,11 @@
                 "-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON",
                 "-DHTTPLIB_REQUIRE_OPENSSL=ON"
             ],
-            "sources" : [
+            "sources": [
                 {
-                    "type" : "archive",
-                    "url" : "https://github.com/yhirose/cpp-httplib/archive/refs/tags/v0.15.3.tar.gz",
-                    "sha256" : "2121bbf38871bb2aafb5f7f2b9b94705366170909f434428352187cb0216124e"
+                    "type": "archive",
+                    "url": "https://github.com/yhirose/cpp-httplib/archive/refs/tags/v0.18.1.tar.gz",
+                    "sha256": "405abd8170f2a446fc8612ac635d0db5947c0d2e156e32603403a4496255ff00"
                 }
             ]
         },
@@ -79,10 +78,17 @@
             "name": "tremotesf",
             "buildsystem": "cmake-ninja",
             "builddir": true,
+            "build-options": {
+                "env": {
+                    "CTEST_OUTPUT_ON_FAILURE": "1",
+                    "ASAN_OPTIONS": "detect_leaks=0"
+                }
+            },
             "config-opts": [
                 "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
                 "-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON",
-                "-DTREMOTESF_WITH_HTTPLIB=system"
+                "-DTREMOTESF_WITH_HTTPLIB=system",
+                "-DTREMOTESF_ASAN=ON"
             ],
             "run-tests": true,
             "sources": [

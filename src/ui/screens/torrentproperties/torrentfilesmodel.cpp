@@ -4,12 +4,9 @@
 
 #include "torrentfilesmodel.h"
 
-#include <QApplication>
-#include <QFutureWatcher>
 #include <QStringBuilder>
-#include <QStyle>
-#include <QtConcurrentRun>
 
+#include "coroutines/threadpool.h"
 #include "log/log.h"
 #include "rpc/mounteddirectoriesutils.h"
 #include "rpc/torrent.h"
@@ -47,13 +44,11 @@ namespace tremotesf {
                     ids.push_back(static_cast<TorrentFilesModelFile*>(entry)->id());
                 }
             }
-            std::sort(ids.begin(), ids.end());
-            ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
+            std::ranges::sort(ids);
+            const auto toErase = std::ranges::unique(ids);
+            ids.erase(toErase.begin(), toErase.end());
             return ids;
         }
-
-        using FutureWatcher =
-            QFutureWatcher<std::pair<std::shared_ptr<TorrentFilesModelDirectory>, std::vector<TorrentFilesModelFile*>>>;
 
         std::pair<std::shared_ptr<TorrentFilesModelDirectory>, std::vector<TorrentFilesModelFile*>>
         doCreateTree(const std::vector<TorrentFile>& files) {
@@ -122,7 +117,7 @@ namespace tremotesf {
                 QObject::connect(mTorrent, &Torrent::filesUpdated, this, &TorrentFilesModel::update);
                 QObject::connect(mTorrent, &Torrent::fileRenamed, this, &TorrentFilesModel::fileRenamed);
                 if (mTorrent->isFilesEnabled()) {
-                    logWarning("{} already has enabled files, this shouldn't happen", *mTorrent);
+                    warning().log("{} already has enabled files, this shouldn't happen", *mTorrent);
                 }
                 mTorrent->setFilesEnabled(true);
             } else {
@@ -199,36 +194,30 @@ namespace tremotesf {
         if (mLoaded) {
             updateTree(changed);
         } else {
-            createTree();
+            mCoroutineScope.launch(createTree());
         }
     }
 
-    void TorrentFilesModel::createTree() {
+    Coroutine<> TorrentFilesModel::createTree() {
         if (mCreatingTree) {
-            return;
+            co_return;
         }
 
         mCreatingTree = true;
         beginResetModel();
 
-        const auto future =
-            QtConcurrent::run([files = std::vector(mTorrent->files())]() { return doCreateTree(files); });
+        auto [rootDirectory, files] = co_await runOnThreadPool(
+            [](const std::vector<TorrentFile>& files) { return doCreateTree(files); },
+            mTorrent->files()
+        );
 
-        auto watcher = new FutureWatcher(this);
-        QObject::connect(watcher, &FutureWatcher::finished, this, [=, this] {
-            auto [rootDirectory, files] = watcher->result();
+        mRootDirectory = std::move(rootDirectory);
+        endResetModel();
 
-            mRootDirectory = std::move(rootDirectory);
-            endResetModel();
+        mFiles = std::move(files);
 
-            mFiles = std::move(files);
-
-            setLoaded(true);
-            mCreatingTree = false;
-
-            watcher->deleteLater();
-        });
-        watcher->setFuture(future);
+        setLoaded(true);
+        mCreatingTree = false;
     }
 
     void TorrentFilesModel::resetTree() {

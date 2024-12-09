@@ -8,17 +8,18 @@
 #include <QObject>
 #include <QStringList>
 
-#include "ipc/ipcserver.h"
 #include "rpc/rpc.h"
+#include "coroutines/scope.h"
 
 class QByteArray;
 class QDragEnterEvent;
 class QDropEvent;
+class QMimeData;
 class QString;
 class QSystemTrayIcon;
-class QTimer;
 
 namespace tremotesf {
+    class TorrentMetainfoFile;
 
     class MainWindowViewModel final : public QObject {
         Q_OBJECT
@@ -31,33 +32,44 @@ namespace tremotesf {
         static void processDragEnterEvent(QDragEnterEvent* event);
         void processDropEvent(QDropEvent* event);
         void pasteShortcutActivated();
+        void triggeredAddTorrentLinkAction();
+        void acceptedFileDialog(QStringList files);
 
         void setupNotificationsController(QSystemTrayIcon* trayIcon);
 
         enum class StartupActionResult { ShowAddServerDialog, DoNothing };
         StartupActionResult performStartupAction();
 
-        void addTorrentFilesWithoutDialog(const QStringList& files);
-        void addTorrentLinksWithoutDialog(const QStringList& urls);
-
     private:
         Rpc mRpc{};
-        QStringList mPendingFilesToOpen{};
-        QStringList mPendingUrlsToOpen{};
-        QTimer* delayedTorrentAddMessageTimer{};
+        CoroutineScope mAddingTorrentsCoroutineScope{};
 
-        void addTorrents(
-            const QStringList& files,
-            const QStringList& urls,
-            const std::optional<QByteArray>& windowActivationToken = {}
-        );
+        bool addTorrentsFromClipboard(bool onlyUrls = false);
+        bool addTorrentsFromMimeData(const QMimeData* mimeData, bool onlyUrls);
+
+        Coroutine<std::vector<std::pair<Torrent*, std::vector<std::set<QString>>>>>
+        separateTorrentsThatAlreadyExistForFiles(QStringList& files);
+        Coroutine<> parseTorrentFile(QString filePath, std::vector<std::pair<QString, TorrentMetainfoFile>>& output);
+        void addTorrentFilesWithoutDialog(const QStringList& files);
+
+        std::vector<std::pair<Torrent*, std::vector<std::set<QString>>>>
+        separateTorrentsThatAlreadyExistForLinks(QStringList& urls);
+        void addTorrentLinksWithoutDialog(QStringList urls);
+
+        Coroutine<>
+        addTorrents(QStringList files, QStringList urls, std::optional<QByteArray> windowActivationToken = {});
 
     signals:
         void showWindow(const std::optional<QByteArray>& windowActivationToken);
         void showAddTorrentDialogs(
             const QStringList& files, const QStringList& urls, const std::optional<QByteArray>& windowActivationToken
         );
+        void askForMergingTrackers(
+            const std::vector<std::pair<Torrent*, std::vector<std::set<QString>>>>& existingTorrents,
+            const std::optional<QByteArray>& windowActivationToken
+        );
         void showDelayedTorrentAddMessage(const QStringList& torrents);
+        void hideDelayedTorrentAddMessage();
     };
 }
 

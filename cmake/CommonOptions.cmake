@@ -87,7 +87,6 @@ function(set_common_options_on_targets)
                 /w44365
                 /w44388
                 /w44577
-                /w44623
                 /we4774
                 /we4777
                 /w44800
@@ -96,15 +95,28 @@ function(set_common_options_on_targets)
                 /we4906
                 /w45204
             )
+            if (TREMOTESF_ASAN)
+                list(APPEND common_compile_options /fsanitize=address /D_DISABLE_VECTOR_ANNOTATION /D_DISABLE_STRING_ANNOTATION)
+            endif()
         elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
             list(TRANSFORM gcc_style_warnings PREPEND "/clang:")
             list(APPEND common_compile_options ${gcc_style_warnings})
+            if (TREMOTESF_ASAN)
+                message(WARNING "Ignoring TREMOTESF_ASAN=ON with clang-cl, it doesn't work out of the box")
+            endif()
         endif()
     else()
         set(
             common_compile_options
             ${gcc_style_warnings}
         )
+        if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 18)
+            list(APPEND common_compile_options -fexperimental-library)
+        endif()
+        if (TREMOTESF_ASAN)
+            list(APPEND common_compile_options -fsanitize=address)
+            list(APPEND common_link_options -fsanitize=address)
+        endif()
     endif()
 
     if (DEFINED TREMOTESF_COMMON_COMPILE_OPTIONS)
@@ -155,6 +167,7 @@ function(set_common_options_on_targets)
             target_compile_options(${target} PRIVATE ${common_compile_options})
             target_compile_definitions(${target} PRIVATE ${common_compile_definitions})
             target_compile_features(${target} PUBLIC ${common_public_compile_features})
+            target_link_options(${target} PRIVATE ${common_link_options})
             set_target_properties(${target} PROPERTIES ${common_target_properties})
         endif()
     endforeach()

@@ -6,18 +6,11 @@
 #define TREMOTESF_FILEUTILS_H
 
 #include <span>
-#include <variant>
-#include <QFile>
+
+#include <QIODevice>
 #include <QString>
 
-#include "log/formatters.h"
-
-namespace fmt {
-    template<>
-    struct formatter<QFile::FileError> : tremotesf::SimpleFormatter {
-        format_context::iterator format(QFile::FileError e, format_context& ctx) FORMAT_CONST;
-    };
-}
+class QFile;
 
 namespace tremotesf {
     class QFileError : public std::runtime_error {

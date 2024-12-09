@@ -4,12 +4,16 @@
 
 #include "peersmodel.h"
 
+#include <algorithm>
+#include <ranges>
+
 #include <QCoreApplication>
 #include <QMetaEnum>
 
 #include "log/log.h"
 #include "rpc/torrent.h"
 #include "formatutils.h"
+#include "stdutils.h"
 
 namespace tremotesf {
     PeersModel::PeersModel(Torrent* torrent, QObject* parent) : QAbstractTableModel(parent) { setTorrent(torrent); }
@@ -128,7 +132,7 @@ namespace tremotesf {
             if (mTorrent) {
                 QObject::connect(mTorrent, &Torrent::peersUpdated, this, &PeersModel::update);
                 if (mTorrent->isPeersEnabled()) {
-                    logWarning("{} already has enabled peers, this shouldn't happen", *mTorrent);
+                    warning().log("{} already has enabled peers, this shouldn't happen", *mTorrent);
                 }
                 mTorrent->setPeersEnabled(true);
             } else {
@@ -153,16 +157,15 @@ namespace tremotesf {
         const auto& newPeers = mTorrent->peers();
 
         for (const auto& [first, last] : changedIndexRanges) {
-            std::copy(newPeers.begin() + first, newPeers.begin() + last, mPeers.begin() + first);
+            std::ranges::copy(slice(newPeers, first, last), mPeers.begin() + first);
             emit dataChanged(index(0, columnCount() - 1), index(last - 1, columnCount() - 1));
         }
 
         if (addedCount > 0) {
-            beginInsertRows(QModelIndex(), static_cast<int>(mPeers.size()), static_cast<int>(newPeers.size()) - 1);
+            beginInsertRows({}, static_cast<int>(mPeers.size()), static_cast<int>(newPeers.size()) - 1);
             mPeers.reserve(newPeers.size());
-            std::copy(
-                newPeers.begin() + static_cast<ptrdiff_t>(mPeers.size()),
-                newPeers.end(),
+            std::ranges::copy(
+                std::views::drop(newPeers, static_cast<ptrdiff_t>(mPeers.size())),
                 std::back_insert_iterator(mPeers)
             );
             endInsertRows();

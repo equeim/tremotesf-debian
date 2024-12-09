@@ -5,13 +5,11 @@
 #include "commondelegate.h"
 
 #include <stdexcept>
-#include <utility>
 
 #include <QAbstractItemView>
 #include <QApplication>
 #include <QFontMetrics>
 #include <QHelpEvent>
-#include <QPainter>
 #include <QStyle>
 #include <QStyleFactory>
 #include <QStyleOptionProgressBar>
@@ -89,25 +87,25 @@ namespace tremotesf {
         if (opt.widget && opt.widget->isActiveWindow()) {
             progressBar.palette.setCurrentColorGroup(QPalette::Active);
         }
-        const auto knownStyle = determineStyle(style);
         if constexpr (targetOs == TargetOs::UnixMacOS) {
-            if (knownStyle == KnownStyle::macOS) {
+            if (determineStyle(style) == KnownStyle::macOS) {
                 style = fusionStyle();
             }
-        }
+        } else {
 #if QT_VERSION_MAJOR == 5
-        if (knownStyle == KnownStyle::Breeze) {
-            // Breeze style incorrectly uses WindowText color for text
-            if (progressBar.state.testFlag(QStyle::State_Selected)) {
-                progressBar.palette.setColor(
-                    QPalette::WindowText,
-                    progressBar.palette.color(QPalette::HighlightedText)
-                );
-            } else {
-                progressBar.palette.setColor(QPalette::WindowText, progressBar.palette.color(QPalette::Text));
+            if (determineStyle(style) == KnownStyle::Breeze) {
+                // Breeze style incorrectly uses WindowText color for text
+                if (progressBar.state.testFlag(QStyle::State_Selected)) {
+                    progressBar.palette.setColor(
+                        QPalette::WindowText,
+                        progressBar.palette.color(QPalette::HighlightedText)
+                    );
+                } else {
+                    progressBar.palette.setColor(QPalette::WindowText, progressBar.palette.color(QPalette::Text));
+                }
             }
-        }
 #endif
+        }
         style->drawControl(QStyle::CE_ProgressBar, &progressBar, painter, opt.widget);
     }
 

@@ -8,7 +8,6 @@
 #include <QObject>
 #include <QTime>
 
-#include "log/formatters.h"
 #include "pathutils.h"
 
 class QJsonObject;
@@ -40,6 +39,7 @@ namespace tremotesf {
         [[nodiscard]] bool canShowFreeSpaceForPath() const;
         [[nodiscard]] bool hasSessionIdFile() const;
         [[nodiscard]] bool hasTableMode() const;
+        [[nodiscard]] bool hasTrackerListProperty() const;
 
         int rpcVersion = 0;
         int minimumRpcVersion = 0;
@@ -155,8 +155,5 @@ namespace tremotesf {
         void changed();
     };
 }
-
-SPECIALIZE_FORMATTER_FOR_Q_ENUM(tremotesf::ServerSettingsData::AlternativeSpeedLimitsDays)
-SPECIALIZE_FORMATTER_FOR_Q_ENUM(tremotesf::ServerSettingsData::EncryptionMode)
 
 #endif // TREMOTESF_RPC_SERVERSETTINGS_H

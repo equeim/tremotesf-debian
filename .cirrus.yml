@@ -5,8 +5,8 @@
 build_freebsd_task:
   freebsd_instance:
     matrix:
-    - image_family: freebsd-13-3
-    - image_family: freebsd-14-0
+    - image_family: freebsd-13-4
+    - image_family: freebsd-14-1
 
   only_if: $CIRRUS_BRANCH == 'master' || $CIRRUS_BASE_BRANCH == 'master' || $CIRRUS_BASE_BRANCH =~ 'feature/.*'
 
@@ -16,17 +16,26 @@ build_freebsd_task:
   install_dependencies_script: |
     set -e -o pipefail
     sudo pkg update -f
-    sudo pkg install -y cmake ninja pkgconf libpsl libfmt cpp-httplib qt6-base qt6-tools kf6-kwidgetsaddons kf6-kwindowsystem gettext-tools cxxopts
+    sudo pkg install -y cmake ninja pkgconf libpsl libfmt qt6-base qt6-tools kf6-kwidgetsaddons kf6-kwindowsystem gettext-tools cxxopts
+    if [ "$(freebsd-version -u | cut -d . -f 1)" -eq 14 ]; then
+        sudo pkg install -y cpp-httplib
+    fi
 
   cmake_build_script: |
     set -e -o pipefail
     echo 'Configuring CMake'
-    cmake -S . --preset base -D TREMOTESF_QT6=ON -D TREMOTESF_WITH_HTTPLIB=system
+    if [ "$(freebsd-version -u | cut -d . -f 1)" -eq 14 ]; then
+        httplib=system
+    else
+        httplib=none
+    fi
+    # Not enabling ASAN since it causes weird issues with tests that use openssl
+    cmake -S . --preset base -D TREMOTESF_QT6=ON -D TREMOTESF_WITH_HTTPLIB="$httplib"
     echo 'Building Debug'
     cmake --build --preset base-debug
     echo 'Testing Debug'
-    ctest --preset base-debug
+    ASAN_OPTIONS=detect_leaks=0 ctest --preset base-debug
     echo 'Building Release'
     cmake --build --preset base-release
     echo 'Testing Release'
-    ctest --preset base-release
+    ASAN_OPTIONS=detect_leaks=0 ctest --preset base-release

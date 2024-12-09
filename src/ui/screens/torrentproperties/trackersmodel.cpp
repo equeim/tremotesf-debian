@@ -76,8 +76,6 @@ namespace tremotesf {
     int TrackersModel::columnCount(const QModelIndex&) const { return QMetaEnum::fromType<Column>().keyCount(); }
 
     QVariant TrackersModel::data(const QModelIndex& index, int role) const {
-        //logDebug("data() called with: index = {}, role = {}", index, role);
-        //logDebug("data: column = {}", static_cast<Column>(index.column()));
         const auto& tracker = mTrackers.at(static_cast<size_t>(index.row()));
         if (role == Qt::DisplayRole) {
             switch (static_cast<Column>(index.column())) {
@@ -162,9 +160,9 @@ namespace tremotesf {
     }
 
     std::vector<int> TrackersModel::idsFromIndexes(const QModelIndexList& indexes) const {
-        return createTransforming<std::vector<int>>(indexes, [this](const QModelIndex& index) {
-            return mTrackers.at(static_cast<size_t>(index.row())).tracker.id();
-        });
+        return toContainer<std::vector>(indexes | std::views::transform([this](const QModelIndex& index) {
+                                            return mTrackers.at(static_cast<size_t>(index.row())).tracker.id();
+                                        }));
     }
 
     const Tracker& TrackersModel::trackerAtIndex(const QModelIndex& index) const {
@@ -180,8 +178,8 @@ namespace tremotesf {
         std::vector<TrackersModel::TrackerItem>::iterator findNewItemForItem(
             std::vector<TrackersModel::TrackerItem>& newItems, const TrackersModel::TrackerItem& item
         ) override {
-            return std::find_if(newItems.begin(), newItems.end(), [item](const TrackersModel::TrackerItem& tracker) {
-                return tracker.tracker.id() == item.tracker.id();
+            return std::ranges::find(newItems, item.tracker.id(), [](const auto& tracker) {
+                return tracker.tracker.id();
             });
         }
 
@@ -199,9 +197,7 @@ namespace tremotesf {
         TrackersModelUpdater updater(*this);
         const auto& trackers = mTorrent->data().trackers;
         updater.update(mTrackers, std::vector<TrackerItem>(trackers.begin(), trackers.end()));
-        if (std::any_of(trackers.begin(), trackers.end(), [](const Tracker& tracker) {
-                return tracker.nextUpdateTime().isValid();
-            })) {
+        if (std::ranges::any_of(trackers, [](const Tracker& tracker) { return tracker.nextUpdateTime().isValid(); })) {
             mEtaUpdateTimer->start();
         }
     }
@@ -210,7 +206,7 @@ namespace tremotesf {
         TrackersModelUpdater updater(*this);
         updater.update(
             mTrackers,
-            createTransforming<std::vector<TrackerItem>>(mTrackers, std::mem_fn(&TrackerItem::withUpdatedEta))
+            toContainer<std::vector>(mTrackers | std::views::transform(&TrackerItem::withUpdatedEta))
         );
     }
 }

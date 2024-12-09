@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: CC0-1.0
 
+%bcond asan 0
+
 %global app_id org.equeim.Tremotesf
 
 %if %{defined suse_version} || 0%{?fedora} >= 40
@@ -11,7 +13,7 @@
 %endif
 
 Name:       tremotesf
-Version:    2.6.2
+Version:    2.7.4
 Release:    1%{!?suse_version:%{?dist}}
 Summary:    Remote GUI for transmission-daemon
 %if %{defined suse_version}
@@ -31,7 +33,6 @@ BuildRequires: gettext
 BuildRequires: make
 BuildRequires: zstd
 BuildRequires: cmake(Qt%{qt_version})
-BuildRequires: cmake(Qt%{qt_version}Concurrent)
 BuildRequires: cmake(Qt%{qt_version}Core)
 BuildRequires: cmake(Qt%{qt_version}DBus)
 BuildRequires: cmake(Qt%{qt_version}LinguistTools)
@@ -48,15 +49,23 @@ BuildRequires: openssl-devel
 %if %{defined fedora}
 BuildRequires: cmake(httplib)
 BuildRequires: libappstream-glib
-%if "%{toolchain}" == "clang"
+  %if "%{toolchain}" == "clang"
 BuildRequires: clang
-%else
+    %if %{with asan}
+BuildRequires: compiler-rt
+    %endif
+  %else
 BuildRequires: gcc-c++
-%endif
-%if %{qt_version} == 5
+    %if %{with asan}
+BuildRequires: libasan
+    %endif
+  %endif
+Requires: qt%{qt_version}-qtsvg
+Requires: breeze-icon-theme
+  %if %{qt_version} == 5
 Requires: kwayland-integration
-%endif
-%global tremotesf_with_httplib system
+  %endif
+  %global tremotesf_with_httplib system
 %endif
 
 %if %{defined suse_version}
@@ -64,12 +73,16 @@ BuildRequires: pkgconfig(cpp-httplib)
 BuildRequires: appstream-glib
 # OBS complains about not owned directories if hicolor-icon-theme isn't installed at build time
 BuildRequires: hicolor-icon-theme
+Requires: libQt6Svg6
+Requires: kf6-breeze-icons
 %global _metainfodir %{_datadir}/metainfo
 %global tremotesf_with_httplib system
 %endif
 
 %if %{defined mageia}
 BuildRequires: appstream-util
+Requires: qtsvg5
+Requires: breeze-icons
 %if %{qt_version} == 5
 Requires: kwayland-integration
 %endif
@@ -85,10 +98,11 @@ Remote GUI for Transmission BitTorrent client.
 
 
 %build
-%cmake -D TREMOTESF_QT6=%[%{qt_version} == 6 ? "ON" : "OFF"] -D TREMOTESF_WITH_HTTPLIB=%{tremotesf_with_httplib}
+%cmake -D TREMOTESF_QT6=%[%{qt_version} == 6 ? "ON" : "OFF"] -D TREMOTESF_WITH_HTTPLIB=%{tremotesf_with_httplib} -D TREMOTESF_ASAN=%{with asan}
 %cmake_build
 
 %check
+export ASAN_OPTIONS=detect_leaks=0
 %ctest
 
 %install
@@ -103,6 +117,24 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{app_id}.desktop
 %{_metainfodir}/%{app_id}.appdata.xml
 
 %changelog
+* Fri Dec 06 2024 Alexey Rochev <equeim@gmail.com> - 2.7.4-1
+- tremotesf-2.7.4
+
+* Wed Nov 20 2024 Alexey Rochev <equeim@gmail.com> - 2.7.3-1
+- tremotesf-2.7.3
+
+* Sun Sep 15 2024 Alexey Rochev <equeim@gmail.com> - 2.7.2-1
+- tremotesf-2.7.2
+
+* Fri Sep 13 2024 Alexey Rochev <equeim@gmail.com> - 2.7.1-1
+- tremotesf-2.7.1
+
+* Sat Aug 31 2024 Alexey Rochev <equeim@gmail.com> - 2.7.0-1
+- tremotesf-2.7.0
+
+* Mon Apr 22 2024 Alexey Rochev <equeim@gmail.com> - 2.6.3-1
+- tremotesf-2.6.3
+
 * Mon Apr 01 2024 Alexey Rochev <equeim@gmail.com> - 2.6.2-1
 - tremotesf-2.6.2
 

@@ -6,6 +6,8 @@
 
 #include <system_error>
 
+#include <fmt/format.h>
+
 #include <windows.h>
 
 #include <guiddef.h>
@@ -16,7 +18,7 @@
 namespace tremotesf {
     namespace {
         bool isWindowsVersionOrGreater(DWORD major, DWORD minor, DWORD build) {
-            logDebug(
+            debug().log(
                 "isWindowsVersionOrGreater() called with: major = {}, minor = {}, build = {}",
                 major,
                 minor,
@@ -39,7 +41,7 @@ namespace tremotesf {
             const auto ret =
                 VerifyVersionInfoW(&info, VER_MAJORVERSION | VER_MINORVERSION | VER_BUILDNUMBER, conditionMask) !=
                 FALSE;
-            logDebug("isWindowsVersionOrGreater: returning {}", ret);
+            debug().log("isWindowsVersionOrGreater: returning {}", ret);
             return ret;
         }
 

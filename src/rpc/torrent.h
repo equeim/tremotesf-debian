@@ -6,12 +6,14 @@
 #define TREMOTESF_RPC_TORRENT_H
 
 #include <optional>
+#include <set>
 #include <span>
 #include <vector>
 
 #include <QDateTime>
 #include <QJsonArray>
 #include <QObject>
+#include <QTimeZone>
 
 #include "log/formatters.h"
 #include "peer.h"
@@ -102,16 +104,16 @@ namespace tremotesf {
 
         int peersLimit{};
 
-        QDateTime addedDate{{}, {}, Qt::UTC};
-        QDateTime activityDate{{}, {}, Qt::UTC};
-        QDateTime doneDate{{}, {}, Qt::UTC};
+        QDateTime addedDate{{}, {}, QTimeZone::utc()};
+        QDateTime activityDate{{}, {}, QTimeZone::utc()};
+        QDateTime doneDate{{}, {}, QTimeZone::utc()};
 
         IdleSeedingLimitMode idleSeedingLimitMode{};
         int idleSeedingLimit{};
         QString downloadDirectory{};
         QString comment{};
         QString creator{};
-        QDateTime creationDate{{}, {}, Qt::UTC};
+        QDateTime creationDate{{}, {}, QTimeZone::utc()};
         Priority bandwidthPriority{};
         bool honorSessionLimits;
 
@@ -130,6 +132,7 @@ namespace tremotesf {
         void updateProperty(
             TorrentData::UpdateKey key, const QJsonValue& value, bool& changed, bool firstTime, const Rpc* rpc
         );
+        void applyTrackerErrorWorkaround(bool& changed);
     };
 
     class Torrent final : public QObject {
@@ -166,7 +169,7 @@ namespace tremotesf {
         void setIdleSeedingLimitMode(TorrentData::IdleSeedingLimitMode mode);
         void setIdleSeedingLimit(int limit);
 
-        void addTrackers(const QStringList& announceUrls);
+        void addTrackers(std::span<const std::set<QString>> announceUrls);
         void setTracker(int trackerId, const QString& announce);
         void removeTrackers(std::span<const int> trackerIds);
 
@@ -214,18 +217,18 @@ namespace tremotesf {
         );
         void fileRenamed(const QString& filePath, const QString& newName);
     };
-}
 
-SPECIALIZE_FORMATTER_FOR_Q_ENUM(tremotesf::TorrentData::Status)
-SPECIALIZE_FORMATTER_FOR_Q_ENUM(tremotesf::TorrentData::Error)
-SPECIALIZE_FORMATTER_FOR_Q_ENUM(tremotesf::TorrentData::Priority)
-SPECIALIZE_FORMATTER_FOR_Q_ENUM(tremotesf::TorrentData::RatioLimitMode)
-SPECIALIZE_FORMATTER_FOR_Q_ENUM(tremotesf::TorrentData::IdleSeedingLimitMode)
+    namespace impl {
+        std::vector<std::set<QString>> mergeTrackers(
+            const std::vector<std::set<QString>>& existingTrackers, std::span<const std::set<QString>> newTrackers
+        );
+    }
+}
 
 namespace fmt {
     template<>
     struct formatter<tremotesf::Torrent> : tremotesf::SimpleFormatter {
-        format_context::iterator format(const tremotesf::Torrent& torrent, format_context& ctx) FORMAT_CONST;
+        format_context::iterator format(const tremotesf::Torrent& torrent, format_context& ctx) const;
     };
 }
 

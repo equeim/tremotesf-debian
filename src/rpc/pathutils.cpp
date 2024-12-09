@@ -19,9 +19,18 @@ namespace tremotesf {
 
         enum class PathType { Unix, WindowsAbsoluteDOSFilePath, WindowsUNCOrDOSDevicePath };
 
+        QRegularExpressionMatch regexMatch(const QRegularExpression& regex, QStringView subjectView) {
+            return regex
+#if QT_VERSION_MAJOR >= 6
+                .matchView(subjectView);
+#else
+                .match(subjectView);
+#endif
+        }
+
         bool isWindowsUNCOrDOSDevicePath(QStringView path) {
             static const QRegularExpression regex(R"(^(?:\\|//).*$)"_l1);
-            return regex.match(path).hasMatch();
+            return regexMatch(regex, path).hasMatch();
         }
 
         PathType determinePathType(QStringView path, PathOs pathOs) {
@@ -68,7 +77,7 @@ namespace tremotesf {
             path.replace(regex, unixSeparatorString);
         }
 
-        void dropTrailingSeparator(QString& path, PathType pathType) {
+        void dropOrAddTrailingSeparator(QString& path, PathType pathType) {
             const auto minimumLength = [pathType] {
                 switch (pathType) {
                 case PathType::Unix:
@@ -80,7 +89,12 @@ namespace tremotesf {
                 }
                 throw std::logic_error("Unknown PathOs value");
             }();
-            if (path.size() <= minimumLength) return;
+            if (path.size() <= minimumLength) {
+                if (pathType == PathType::WindowsAbsoluteDOSFilePath && path.size() == 2) {
+                    path.append(unixSeparatorChar);
+                }
+                return;
+            }
             if (path.back() == unixSeparatorChar) {
                 path.chop(1);
             }
@@ -88,8 +102,8 @@ namespace tremotesf {
     }
 
     bool isAbsoluteWindowsDOSFilePath(QStringView path) {
-        static const QRegularExpression regex(R"(^[A-Za-z]:[\\/].*$)"_l1);
-        return regex.match(path).hasMatch();
+        static const QRegularExpression regex(R"(^[A-Za-z]:[\\/]?.*$)"_l1);
+        return regexMatch(regex, path).hasMatch();
     }
 
     QString normalizePath(const QString& path, PathOs pathOs) {
@@ -108,7 +122,7 @@ namespace tremotesf {
             }
         }
         collapseRepeatingSeparators(normalized, pathType);
-        dropTrailingSeparator(normalized, pathType);
+        dropOrAddTrailingSeparator(normalized, pathType);
         return normalized;
     }
 
