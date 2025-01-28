@@ -2,6 +2,10 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Needed to access deprecated QSsl::SslProtocol enum values
+#undef QT_DISABLE_DEPRECATED_BEFORE
+#undef QT_DISABLE_DEPRECATED_UP_TO
+
 #include "requestrouter.h"
 
 #include <optional>
@@ -23,11 +27,27 @@
 #include "pragmamacros.h"
 #include "rpc.h"
 
+DISABLE_RANGE_FORMATTING(QJsonObject)
 SPECIALIZE_FORMATTER_FOR_QDEBUG(QJsonObject)
 SPECIALIZE_FORMATTER_FOR_QDEBUG(QNetworkProxy)
 SPECIALIZE_FORMATTER_FOR_QDEBUG(QSslError)
 
 namespace fmt {
+    template<>
+    struct formatter<QSslCertificate> : tremotesf::SimpleFormatter {
+        fmt::format_context::iterator format(const QSslCertificate& certificate, fmt::format_context& ctx) const {
+            // QSslCertificate::toText is implemented only for OpenSSL backend
+#if QT_VERSION_MAJOR >= 6
+            using tremotesf::operator""_l1;
+            static const bool isOpenSSL = (QSslSocket::activeBackend() == "openssl"_l1);
+            if (!isOpenSSL) {
+                return tremotesf::impl::QDebugFormatter<QSslCertificate>{}.format(certificate, ctx);
+            }
+#endif
+            return fmt::formatter<QString>{}.format(certificate.toText(), ctx);
+        }
+    };
+
     template<>
     struct formatter<QSsl::SslProtocol> : tremotesf::SimpleFormatter {
         fmt::format_context::iterator format(QSsl::SslProtocol protocol, fmt::format_context& ctx) const {
@@ -161,7 +181,7 @@ namespace tremotesf::impl {
                         i,
                         sslError.error(),
                         sslError.errorString(),
-                        sslError.certificate().toText()
+                        sslError.certificate()
                     ));
                     ++i;
                 }
@@ -208,11 +228,12 @@ namespace tremotesf::impl {
                 mSslConfiguration.setPrivateKey(mConfiguration->clientPrivateKey);
             }
             mExpectedSslErrors.clear();
-            mExpectedSslErrors.reserve(mConfiguration->serverCertificateChain.size() * 3);
+            mExpectedSslErrors.reserve(mConfiguration->serverCertificateChain.size() * 4);
             for (const auto& certificate : mConfiguration->serverCertificateChain) {
                 mExpectedSslErrors.push_back(QSslError(QSslError::HostNameMismatch, certificate));
                 mExpectedSslErrors.push_back(QSslError(QSslError::SelfSignedCertificate, certificate));
                 mExpectedSslErrors.push_back(QSslError(QSslError::SelfSignedCertificateInChain, certificate));
+                mExpectedSslErrors.push_back(QSslError(QSslError::CertificateUntrusted, certificate));
             }
         }
 

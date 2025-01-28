@@ -248,6 +248,7 @@ namespace {
             QCOMPARE(requestsCount.load(), retryAttempts + 1);
         }
 
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
         void checkSelfSignedCertificateError() {
             TestHttpServer<httplib::SSLServer> server(
                 TEST_DATA_PATH "/root-certificate.pem",
@@ -319,7 +320,12 @@ namespace {
             }
             const auto error = waitForError("foo"_l1, QByteArray{});
             QCOMPARE(error.has_value(), true);
-            QCOMPARE(error.value(), RpcError::ConnectionError);
+            if (error.value() == RpcError::TimedOut) {
+                // Can happen with TLS 1.3
+                warning().log("Connecting to server requiring client certificate timed out");
+            } else {
+                QCOMPARE(error.value(), RpcError::ConnectionError);
+            }
         }
 
         void checkClientCertificateSuccess() {
@@ -348,6 +354,7 @@ namespace {
             QCOMPARE(response.has_value(), true);
             QCOMPARE(response->success, true);
         }
+#endif
 
         void checkInvalidJsonIsHandled() {
             mServer.handle([&](const httplib::Request&, httplib::Response& res) {

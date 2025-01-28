@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: CC0-1.0
 
 cmake_minimum_required(VERSION 3.25)
-cmake_policy(VERSION ${CMAKE_MINIMUM_REQUIRED_VERSION}..3.30)
+cmake_policy(VERSION ${CMAKE_MINIMUM_REQUIRED_VERSION}...3.31)
 
 set(languages CXX)
 if (APPLE)
@@ -11,7 +11,7 @@ if (APPLE)
     list(APPEND languages OBJCXX)
 endif ()
 
-project(tremotesf VERSION 2.7.4 LANGUAGES ${languages})
+project(tremotesf VERSION 2.7.5 LANGUAGES ${languages})
 
 option(TREMOTESF_QT6 "Build with Qt 6" ON)
 option(TREMOTESF_ASAN "Build with AddressSanitizer" OFF)

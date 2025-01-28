@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        container-image: ['fedora:39', 'fedora:40', 'fedora:41', 'opensuse/tumbleweed:latest']
+        container-image: ['fedora:40', 'fedora:41', 'opensuse/tumbleweed:latest']
         compiler: ['gcc', 'clang']
         exclude:
         - container-image: 'opensuse/tumbleweed:latest'
@@ -134,7 +134,8 @@ jobs:
         DEBIAN_FRONTEND=noninteractive apt-get --no-install-recommends --assume-yes install ../*.deb
 
   build-flatpak:
-    runs-on: ubuntu-latest
+    # https://github.com/actions/runner-images/issues/11359
+    runs-on: ubuntu-22.04
 
     steps:
     - name: Add GCC problem matcher
@@ -155,17 +156,21 @@ jobs:
       run: |
         flatpak-builder --user --install-deps-from=flathub build-dir org.equeim.Tremotesf.json
 
+    - name: Check that generation of release manifest works
+      run: |
+        readonly archive="$(.github/workflows/make-source-archive.py zstd)"
+        .github/workflows/make-flatpak-manifest-for-release.py test "$archive"
+        echo "Release Flatpak manifest:"
+        cat org.equeim.Tremotesf.json
+
   build-windows-msvc:
     strategy:
       fail-fast: false
       matrix:
-        toolchain:
-        - msvc
-        - msvc-clang
-
+        toolchain: ['msvc', 'msvc-clang']
     uses: ./.github/workflows/build-windows-msvc.yml
     with:
-      build-with-msvc-clang-toolchain: ${{ matrix.toolchain == 'msvc-clang' && 'true' || 'false' }}
+      toolchain: ${{ matrix.toolchain  }}
 
   build-windows-mingw:
     runs-on: windows-latest
@@ -212,13 +217,13 @@ jobs:
           cmake -S . --preset base -D TREMOTESF_QT6=ON -D TREMOTESF_WITH_HTTPLIB=bundled -D TREMOTESF_ASAN=ON -D CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE=OFF
           echo '::endgroup'
           echo '::group::Building Debug'
-          cmake --build --preset base-debug
+          cmake --build --preset base-debug -v
           echo '::endgroup'
           echo '::group::Testing Debug'
           ctest --preset base-debug
           echo '::endgroup'
           echo '::group::Building Release'
-          cmake --build --preset base-release
+          cmake --build --preset base-release -v
           echo '::endgroup'
           echo '::group::Testing Release'
           ctest --preset base-release

@@ -25,7 +25,9 @@ macro(find_system_httplib)
 endmacro()
 
 macro(include_bundled_httplib)
-    set(HTTPLIB_REQUIRE_OPENSSL ON)
+    if (NOT WIN32)
+        set(HTTPLIB_REQUIRE_OPENSSL ON)
+    endif()
     add_subdirectory(3rdparty/cpp-httplib EXCLUDE_FROM_ALL)
 endmacro()
 
