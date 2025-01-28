@@ -5,7 +5,8 @@
 include(CTest)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
-set(TREMOTESF_COMMON_TARGET_PROPERTIES AUTOMOC ON AUTORCC ON)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
 
 find_package(Threads REQUIRED)
 find_package(fmt 9.1 REQUIRED)
@@ -445,7 +446,7 @@ if (BUILD_TESTING)
         include("${CMAKE_SOURCE_DIR}/cmake/FindCppHttplib.cmake")
         find_cpp_httplib()
         add_executable(requestrouter_test rpc/requestrouter_test.cpp)
-        target_compile_definitions(requestrouter_test PRIVATE TEST_DATA_PATH="${CMAKE_CURRENT_SOURCE_DIR}/rpc/test-data" CPPHTTPLIB_OPENSSL_SUPPORT)
+        target_compile_definitions(requestrouter_test PRIVATE TEST_DATA_PATH="${CMAKE_CURRENT_SOURCE_DIR}/rpc/test-data")
         add_test(NAME requestrouter_test COMMAND requestrouter_test)
         target_link_libraries(requestrouter_test PRIVATE tremotesf_objects Qt::Test)
         if (TARGET PkgConfig::httplib)

@@ -33,7 +33,7 @@ def get_project_version() -> str:
             for arg in args:
                 if found_version:
                     return arg
-                elif arg.lower() == "version":
+                if arg.lower() == "version":
                     found_version = True
     raise RuntimeError("Failed to find version in CMake trace output")
 
@@ -47,10 +47,12 @@ def make_tar_archive(tempdir: PurePath, debian: bool) -> PurePath:
         archive_filename = f"tremotesf-{version}.tar"
     archive_path = tempdir / archive_filename
     logging.info(f"Making tar archive {archive_path}")
-    files = subprocess.run(["git", "ls-files", "--recurse-submodules"],
+    files = subprocess.run(["git", "ls-files", "--recurse-submodules", "-z"],
                            check=True,
                            stdout=subprocess.PIPE,
-                           text=True).stdout.splitlines()
+                           text=True).stdout.split("\0")
+    # There is an empty string in the end for some reason
+    files = [f for f in files if f]
     logging.info(f"Archiving {len(files)} files")
     with tarfile.open(archive_path, mode="x") as tar:
         for file in files:
@@ -74,7 +76,6 @@ def compress_zstd(output_directory: PurePath, tar_path: PurePath) -> PurePath:
 
 
 class CompressionType(Enum):
-    ALL = "all"
     GZIP = "gzip"
     ZSTD = "zstd"
 
@@ -83,7 +84,8 @@ def main():
     logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('compression',
+    parser.add_argument("compression_types",
+                        nargs="+",
                         choices=[member.value for member in list(CompressionType)],
                         help="Compression type")
     parser.add_argument("--output-directory",
@@ -93,7 +95,7 @@ def main():
                         help="Make Debian upstream tarball")
 
     args = parser.parse_args()
-    compression_type = CompressionType(args.compression)
+    compression_types = [CompressionType(arg) for arg in args.compression_types]
     if args.output_directory:
         output_directory = PurePath(args.output_directory)
     else:
@@ -101,13 +103,12 @@ def main():
 
     with TemporaryDirectory() as tempdir:
         tar = make_tar_archive(PurePath(tempdir), args.debian)
-        if compression_type == CompressionType.ALL:
-            print(compress_gzip(output_directory, tar))
-            print(compress_zstd(output_directory, tar))
-        elif compression_type == CompressionType.GZIP:
-            print(compress_gzip(output_directory, tar))
-        elif compression_type == CompressionType.ZSTD:
-            print(compress_zstd(output_directory, tar))
+        for compression_type in compression_types:
+            match compression_type:
+                case CompressionType.GZIP:
+                    print(compress_gzip(output_directory, tar))
+                case CompressionType.ZSTD:
+                    print(compress_zstd(output_directory, tar))
 
 
 if __name__ == "__main__":

@@ -17,35 +17,15 @@
     "cleanup": [
         "/include",
         "/lib/cmake",
-        "/lib/pkgconfig",
-        "/lib/*.a"
+        "/lib/pkgconfig"
     ],
     "modules": [
-        {
-            "name": "fmt",
-            "buildsystem": "cmake-ninja",
-            "builddir": true,
-            "config-opts": [
-                "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
-                "-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON",
-                "-DFMT_DOC=OFF",
-                "-DFMT_TEST=OFF"
-            ],
-            "sources": [
-                {
-                    "type": "archive",
-                    "url": "https://github.com/fmtlib/fmt/releases/download/11.0.2/fmt-11.0.2.zip",
-                    "sha256": "40fc58bebcf38c759e11a7bd8fdc163507d2423ef5058bba7f26280c5b9c5465"
-                }
-            ]
-        },
         {
             "name": "cxxopts",
             "buildsystem": "cmake-ninja",
             "builddir": true,
             "config-opts": [
                 "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
-                "-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON",
                 "-DCXXOPTS_BUILD_EXAMPLES=OFF",
                 "-DCXXOPTS_BUILD_TESTS=OFF"
             ],
@@ -63,14 +43,13 @@
             "builddir": true,
             "config-opts": [
                 "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
-                "-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON",
                 "-DHTTPLIB_REQUIRE_OPENSSL=ON"
             ],
             "sources": [
                 {
                     "type": "archive",
-                    "url": "https://github.com/yhirose/cpp-httplib/archive/refs/tags/v0.18.1.tar.gz",
-                    "sha256": "405abd8170f2a446fc8612ac635d0db5947c0d2e156e32603403a4496255ff00"
+                    "url": "https://github.com/yhirose/cpp-httplib/archive/refs/tags/v0.18.3.tar.gz",
+                    "sha256": "a0567bcd6c3fe5cef1b329b96245119047f876b49e06cc129a36a7a8dffe173e"
                 }
             ]
         },
