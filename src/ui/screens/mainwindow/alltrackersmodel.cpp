@@ -6,8 +6,8 @@
 
 #include <map>
 
-#include <QApplication>
-#include <QStyle>
+#include <QCoreApplication>
+#include <QIcon>
 
 #include "rpc/torrent.h"
 #include "rpc/tracker.h"
@@ -47,29 +47,18 @@ namespace tremotesf {
 
     int AllTrackersModel::rowCount(const QModelIndex&) const { return static_cast<int>(mTrackers.size()); }
 
-    bool AllTrackersModel::removeRows(int row, int count, const QModelIndex& parent) {
-        beginRemoveRows(parent, row, row + count - 1);
-        const auto first = mTrackers.begin() + row;
-        mTrackers.erase(first, first + count);
-        endRemoveRows();
-        return true;
-    }
-
-    QModelIndex AllTrackersModel::indexForTracker(const QString& tracker) const {
-        for (size_t i = 0, max = mTrackers.size(); i < max; ++i) {
-            const auto& item = mTrackers[i];
-            if (item.tracker == tracker) {
-                return index(static_cast<int>(i));
-            }
-        }
-        return {};
-    }
-
     QModelIndex AllTrackersModel::indexForTorrentsProxyModelFilter() const {
         if (!torrentsProxyModel()) {
             return {};
         }
-        return indexForTracker(torrentsProxyModel()->trackerFilter());
+        const auto filter = torrentsProxyModel()->trackerFilter();
+        for (size_t i = 0, max = mTrackers.size(); i < max; ++i) {
+            const auto& item = mTrackers[i];
+            if (item.tracker == filter) {
+                return index(static_cast<int>(i));
+            }
+        }
+        return {};
     }
 
     void AllTrackersModel::resetTorrentsProxyModelFilter() const {

@@ -6,8 +6,8 @@
 
 #include <algorithm>
 
-#include <QApplication>
-#include <QStyle>
+#include <QCoreApplication>
+#include <QIcon>
 
 #include "rpc/pathutils.h"
 #include "rpc/rpc.h"
@@ -15,30 +15,48 @@
 #include "rpc/serversettings.h"
 #include "ui/itemmodels/modelutils.h"
 #include "ui/screens/mainwindow/downloaddirectoriesmodel.h"
-#include "torrentsproxymodel.h"
 
 #include "desktoputils.h"
+#include "settings.h"
+#include "torrentsproxymodel.h"
 
 namespace tremotesf {
+    DownloadDirectoriesModel::DownloadDirectoriesModel(QObject* parent) : BaseTorrentsFiltersSettingsModel(parent) {
+        const auto settings = Settings::instance();
+        mDisplayFullDownloadDirectoryPath = settings->get_displayFullDownloadDirectoryPath();
+        QObject::connect(settings, &Settings::displayFullDownloadDirectoryPathChanged, this, [this, settings] {
+            mDisplayFullDownloadDirectoryPath = settings->get_displayFullDownloadDirectoryPath();
+        });
+    }
+
     QVariant DownloadDirectoriesModel::data(const QModelIndex& index, int role) const {
         if (!index.isValid()) {
             return {};
         }
         const DirectoryItem& item = mDirectories.at(static_cast<size_t>(index.row()));
         switch (role) {
-        case DirectoryRole:
+        case static_cast<int>(Role::Directory):
             return item.directory;
         case Qt::DecorationRole: {
             return desktoputils::standardDirIcon();
         }
-        case Qt::DisplayRole:
-        case Qt::ToolTipRole:
+        case Qt::DisplayRole: {
             if (item.directory.isEmpty()) {
                 //: Filter option of torrents list's download directory filter. %L1 is total number of torrents
                 return qApp->translate("tremotesf", "All (%L1)").arg(item.torrents);
             }
             //: Filter option of torrents list's download directory filter. %1 is download directory, %L2 is number of torrents with that download directory
-            return qApp->translate("tremotesf", "%1 (%L2)").arg(item.displayDirectory).arg(item.torrents);
+            const auto& text =
+                mDisplayFullDownloadDirectoryPath ? item.displayDirectory : lastPathSegment(item.directory);
+            return qApp->translate("tremotesf", "%1 (%L2)").arg(text).arg(item.torrents);
+        }
+        case Qt::ToolTipRole:
+            if (item.directory.isEmpty()) {
+                return data(index, Qt::DisplayRole);
+            }
+            return item.displayDirectory;
+        case static_cast<int>(Role::AlwaysShowTooltip):
+            return !mDisplayFullDownloadDirectoryPath && !item.directory.isEmpty();
         default:
             return {};
         }
@@ -46,29 +64,18 @@ namespace tremotesf {
 
     int DownloadDirectoriesModel::rowCount(const QModelIndex&) const { return static_cast<int>(mDirectories.size()); }
 
-    bool DownloadDirectoriesModel::removeRows(int row, int count, const QModelIndex& parent) {
-        beginRemoveRows(parent, row, row + count - 1);
-        const auto first = mDirectories.begin() + row;
-        mDirectories.erase(first, first + count);
-        endRemoveRows();
-        return true;
-    }
-
-    QModelIndex DownloadDirectoriesModel::indexForDirectory(const QString& downloadDirectory) const {
-        for (size_t i = 0, max = mDirectories.size(); i < max; ++i) {
-            const auto& item = mDirectories[i];
-            if (item.directory == downloadDirectory) {
-                return index(static_cast<int>(i));
-            }
-        }
-        return {};
-    }
-
     QModelIndex DownloadDirectoriesModel::indexForTorrentsProxyModelFilter() const {
         if (!torrentsProxyModel()) {
             return {};
         }
-        return indexForDirectory(torrentsProxyModel()->downloadDirectoryFilter());
+        const auto filter = torrentsProxyModel()->downloadDirectoryFilter();
+        for (size_t i = 0, max = mDirectories.size(); i < max; ++i) {
+            const auto& item = mDirectories[i];
+            if (item.directory == filter) {
+                return index(static_cast<int>(i));
+            }
+        }
+        return {};
     }
 
     void DownloadDirectoriesModel::resetTorrentsProxyModelFilter() const {
@@ -112,7 +119,7 @@ namespace tremotesf {
 
     void DownloadDirectoriesModel::update() {
         std::vector<DirectoryItem> directories;
-        directories.push_back({.directory = {}, .displayDirectory = {}, .torrents = rpc()->torrentsCount()});
+        directories.push_back({.torrents = rpc()->torrentsCount()});
         for (const auto& torrent : rpc()->torrents()) {
             const QString& directory = torrent->data().downloadDirectory;
             auto found = std::ranges::find(directories, directory, &DirectoryItem::directory);

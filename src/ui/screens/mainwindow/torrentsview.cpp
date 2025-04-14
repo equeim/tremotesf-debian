@@ -16,9 +16,10 @@ namespace tremotesf {
     TorrentsView::TorrentsView(TorrentsProxyModel* model, QWidget* parent) : BaseTreeView(parent) {
         setContextMenuPolicy(Qt::CustomContextMenu);
         setItemDelegate(new CommonDelegate(
-            static_cast<int>(TorrentsModel::Column::ProgressBar),
-            static_cast<int>(TorrentsModel::Role::Sort),
-            static_cast<int>(TorrentsModel::Role::TextElideMode),
+            {.progressBarColumn = static_cast<int>(TorrentsModel::Column::ProgressBar),
+             .progressRole = static_cast<int>(TorrentsModel::Role::Sort),
+             .textElideModeRole = static_cast<int>(TorrentsModel::Role::TextElideMode),
+             .alwaysShowTooltipRole = static_cast<int>(TorrentsModel::Role::AlwaysShowTooltip)},
             this
         ));
         setModel(model);
@@ -26,7 +27,7 @@ namespace tremotesf {
         setRootIsDecorated(false);
 
         const auto header = this->header();
-        if (!header->restoreState(Settings::instance()->torrentsViewHeaderState())) {
+        if (!header->restoreState(Settings::instance()->get_torrentsViewHeaderState())) {
             using C = TorrentsModel::Column;
             const std::set defaultColumns{
                 C::Name,
@@ -60,6 +61,6 @@ namespace tremotesf {
         }
     }
 
-    void TorrentsView::saveState() { Settings::instance()->setTorrentsViewHeaderState(header()->saveState()); }
+    void TorrentsView::saveState() { Settings::instance()->set_torrentsViewHeaderState(header()->saveState()); }
 
 }

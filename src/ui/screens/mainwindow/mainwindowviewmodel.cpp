@@ -150,7 +150,7 @@ namespace tremotesf {
 
     void MainWindowViewModel::triggeredAddTorrentLinkAction() {
         debug().log("MainWindowViewModel: triggeredAddTorrentLinkAction() called");
-        if (Settings::instance()->fillTorrentLinkFromClipboard() && addTorrentsFromClipboard(true)) {
+        if (Settings::instance()->get_fillTorrentLinkFromClipboard() && addTorrentsFromClipboard(true)) {
             return;
         }
         emit showAddTorrentDialogs({}, {QString{}}, {});
@@ -163,9 +163,12 @@ namespace tremotesf {
 
     void MainWindowViewModel::setupNotificationsController(QSystemTrayIcon* trayIcon) {
         const auto controller = NotificationsController::createInstance(trayIcon, &mRpc, this);
-        QObject::connect(controller, &NotificationsController::notificationClicked, this, [this] {
-            emit showWindow({});
-        });
+        QObject::connect(
+            controller,
+            &NotificationsController::notificationClicked,
+            this,
+            [this](const std::optional<QByteArray>& windowActivationToken) { emit showWindow(windowActivationToken); }
+        );
     }
 
     MainWindowViewModel::StartupActionResult MainWindowViewModel::performStartupAction() {
@@ -173,7 +176,7 @@ namespace tremotesf {
             return StartupActionResult::ShowAddServerDialog;
         }
         mRpc.setConnectionConfiguration(Servers::instance()->currentServer().connectionConfiguration);
-        if (Settings::instance()->connectOnStartup()) {
+        if (Settings::instance()->get_connectOnStartup()) {
             mRpc.connect();
         }
         return StartupActionResult::DoNothing;
@@ -256,10 +259,10 @@ namespace tremotesf {
                 {},
                 parameters.priority,
                 parameters.startAfterAdding,
-                parameters.deleteTorrentFile
-                    ? (parameters.moveTorrentFileToTrash ? Rpc::DeleteFileMode::MoveToTrash : Rpc::DeleteFileMode::Delete)
-                    : Rpc::DeleteFileMode::No
-
+                parameters.deleteTorrentFile ? (parameters.moveTorrentFileToTrash ? Rpc::DeleteFileMode::MoveToTrash
+                                                                                  : Rpc::DeleteFileMode::Delete)
+                                             : Rpc::DeleteFileMode::No,
+                {}
             );
         }
     }
@@ -295,7 +298,8 @@ namespace tremotesf {
             std::move(urls),
             std::move(parameters.downloadDirectory),
             parameters.priority,
-            parameters.startAfterAdding
+            parameters.startAfterAdding,
+            {}
         );
     }
 
@@ -305,6 +309,14 @@ namespace tremotesf {
         info().log("MainWindowViewModel: addTorrents() called");
         info().log("MainWindowViewModel: files = {}", files);
         info().log("MainWindowViewModel: urls = {}", urls);
+
+        const auto* const settings = Settings::instance();
+        const auto showMainWindowIfNeeded = [&] {
+            if (settings->get_showMainWindowWhenAddingTorrent()) {
+                emit showWindow(windowActivationToken);
+                windowActivationToken.reset();
+            }
+        };
 
         if (!mRpc.isConnected()) {
             info().log("Postponing opening torrents until connected to server");
@@ -317,19 +329,14 @@ namespace tremotesf {
             }
             if (!mRpc.isConnected()) {
                 info().log("Showing delayed torrent adding message");
-                emit showDelayedTorrentAddMessage(files + urls);
+                showMainWindowIfNeeded();
+                emit showDelayedTorrentAddDialog(files + urls, windowActivationToken);
+                windowActivationToken.reset();
                 co_await waitForSignal(&mRpc, &Rpc::connectedChanged);
             }
         }
 
-        const auto* const settings = Settings::instance();
-
-        if (settings->showMainWindowWhenAddingTorrent()) {
-            emit showWindow(windowActivationToken);
-            windowActivationToken.reset();
-        }
-
-        emit hideDelayedTorrentAddMessage();
+        showMainWindowIfNeeded();
 
         // We can parse magnet links immediately so check whether torrents exist event if we show dialogs
         if (const auto existingTorrents = separateTorrentsThatAlreadyExistForLinks(urls); !existingTorrents.empty()) {
@@ -337,7 +344,7 @@ namespace tremotesf {
             windowActivationToken.reset();
         }
 
-        if (settings->showAddTorrentDialog()) {
+        if (settings->get_showAddTorrentDialog()) {
             emit showAddTorrentDialogs(files, urls, windowActivationToken);
         } else {
             addTorrentLinksWithoutDialog(urls);

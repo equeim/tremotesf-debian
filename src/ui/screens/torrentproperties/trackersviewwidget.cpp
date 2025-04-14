@@ -7,7 +7,6 @@
 #include <array>
 
 #include <QCoreApplication>
-#include <QCursor>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QIcon>
@@ -50,11 +49,10 @@ namespace tremotesf {
         };
     }
 
-    TrackersViewWidget::TrackersViewWidget(Torrent* torrent, Rpc* rpc, QWidget* parent)
+    TrackersViewWidget::TrackersViewWidget(Rpc* rpc, QWidget* parent)
         : QWidget(parent),
-          mTorrent(torrent),
           mRpc(rpc),
-          mModel(new TrackersModel(torrent, this)),
+          mModel(new TrackersModel(this)),
           mProxyModel(new BaseProxyModel(
               mModel, TrackersModel::SortRole, static_cast<int>(TrackersModel::Column::Announce), this
           )),
@@ -65,7 +63,7 @@ namespace tremotesf {
         mTrackersView->setModel(mProxyModel);
         mTrackersView->setSelectionMode(QAbstractItemView::ExtendedSelection);
         mTrackersView->setRootIsDecorated(false);
-        mTrackersView->header()->restoreState(Settings::instance()->trackersViewHeaderState());
+        mTrackersView->header()->restoreState(Settings::instance()->get_trackersViewHeaderState());
         QObject::connect(mTrackersView, &EnterEatingTreeView::activated, this, &TrackersViewWidget::showEditDialogs);
 
         auto removeAction = new QAction(
@@ -78,7 +76,7 @@ namespace tremotesf {
         mTrackersView->addAction(removeAction);
         QObject::connect(removeAction, &QAction::triggered, this, &TrackersViewWidget::removeTrackers);
 
-        QObject::connect(mTrackersView, &EnterEatingTreeView::customContextMenuRequested, this, [=, this](auto pos) {
+        QObject::connect(mTrackersView, &EnterEatingTreeView::customContextMenuRequested, this, [=, this](QPoint pos) {
             if (mTrackersView->indexAt(pos).isValid()) {
                 QMenu contextMenu;
                 QAction* editAction = contextMenu.addAction(
@@ -88,7 +86,7 @@ namespace tremotesf {
                 );
                 QObject::connect(editAction, &QAction::triggered, this, &TrackersViewWidget::showEditDialogs);
                 contextMenu.addAction(removeAction);
-                contextMenu.exec(QCursor::pos());
+                contextMenu.exec(mTrackersView->viewport()->mapToGlobal(pos));
             }
         });
 
@@ -141,13 +139,13 @@ namespace tremotesf {
         });
     }
 
-    void TrackersViewWidget::setTorrent(Torrent* torrent) {
+    void TrackersViewWidget::setTorrent(Torrent* torrent, bool oldTorrentDestroyed) {
         mTorrent = torrent;
-        mModel->setTorrent(torrent);
+        mModel->setTorrent(torrent, oldTorrentDestroyed);
     }
 
     void TrackersViewWidget::saveState() {
-        Settings::instance()->setTrackersViewHeaderState(mTrackersView->header()->saveState());
+        Settings::instance()->set_trackersViewHeaderState(mTrackersView->header()->saveState());
     }
 
     void TrackersViewWidget::addTrackers() {

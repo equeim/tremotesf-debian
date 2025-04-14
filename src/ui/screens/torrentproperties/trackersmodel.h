@@ -8,7 +8,6 @@
 #include <vector>
 
 #include <QAbstractTableModel>
-#include <QPointer>
 
 class QTimer;
 
@@ -27,7 +26,7 @@ namespace tremotesf {
 
         static constexpr auto SortRole = Qt::UserRole;
 
-        explicit TrackersModel(Torrent* torrent = nullptr, QObject* parent = nullptr);
+        explicit TrackersModel(QObject* parent = nullptr);
         ~TrackersModel() override;
         Q_DISABLE_COPY_MOVE(TrackersModel)
 
@@ -37,7 +36,7 @@ namespace tremotesf {
         int rowCount(const QModelIndex& = {}) const override;
 
         Torrent* torrent() const;
-        void setTorrent(Torrent* torrent);
+        void setTorrent(Torrent* torrent, bool oldTorrentDestroyed);
 
         std::vector<int> idsFromIndexes(const QModelIndexList& indexes) const;
         const Tracker& trackerAtIndex(const QModelIndex& index) const;
@@ -53,7 +52,7 @@ namespace tremotesf {
         void update();
         void updateEtas();
 
-        QPointer<Torrent> mTorrent{};
+        Torrent* mTorrent{};
 
         std::vector<TrackerItem> mTrackers;
 

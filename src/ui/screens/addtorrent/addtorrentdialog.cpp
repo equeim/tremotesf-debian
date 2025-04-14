@@ -36,8 +36,10 @@
 #include "torrentfileparser.h"
 #include "coroutines/threadpool.h"
 #include "log/log.h"
-#include "rpc/torrent.h"
 #include "rpc/rpc.h"
+#include "rpc/serversettings.h"
+#include "rpc/torrent.h"
+#include "ui/widgets/editlabelswidget.h"
 #include "ui/widgets/torrentremotedirectoryselectionwidget.h"
 #include "ui/widgets/torrentfilesview.h"
 
@@ -110,7 +112,8 @@ namespace tremotesf {
                     mFilesModel->renamedFiles(),
                     priorityFromComboBoxIndex(mAddTorrentParametersWidgets.priorityComboBox->currentIndex()),
                     mAddTorrentParametersWidgets.startTorrentCheckBox->isChecked(),
-                    determineDeleteFileMode(mAddTorrentParametersWidgets)
+                    determineDeleteFileMode(mAddTorrentParametersWidgets),
+                    mEditLabelsWidget->enabledLabels()
                 );
             }
         } else {
@@ -121,15 +124,16 @@ namespace tremotesf {
                     std::move(urls),
                     mAddTorrentParametersWidgets.downloadDirectoryWidget->path(),
                     priorityFromComboBoxIndex(mAddTorrentParametersWidgets.priorityComboBox->currentIndex()),
-                    mAddTorrentParametersWidgets.startTorrentCheckBox->isChecked()
+                    mAddTorrentParametersWidgets.startTorrentCheckBox->isChecked(),
+                    mEditLabelsWidget->enabledLabels()
                 );
             }
         }
         const auto settings = Settings::instance();
-        if (settings->rememberOpenTorrentDir() && isAddingFile()) {
-            settings->setLastOpenTorrentDirectory(QFileInfo(std::get<FileParams>(mParams).filePath).path());
+        if (settings->get_rememberOpenTorrentDir() && isAddingFile()) {
+            settings->set_lastOpenTorrentDirectory(QFileInfo(std::get<FileParams>(mParams).filePath).path());
         }
-        if (settings->rememberAddTorrentParameters()) {
+        if (settings->get_rememberAddTorrentParameters()) {
             mAddTorrentParametersWidgets.saveToSettings();
         }
         QDialog::accept();
@@ -209,6 +213,7 @@ namespace tremotesf {
 
         auto layout = new QFormLayout(this);
         layout->setSizeConstraint(QLayout::SetMinAndMaxSize);
+        layout->setFieldGrowthPolicy(QFormLayout::FieldGrowthPolicy::AllNonFixedFieldsGrow);
 
         mMessageWidget = new KMessageWidget(this);
         mMessageWidget->setCloseButtonVisible(false);
@@ -252,12 +257,24 @@ namespace tremotesf {
         if (isAddingFile()) {
             mTorrentFilesView = new TorrentFilesView(mFilesModel, mRpc);
             layout->insertRow(rowForWidget(layout, mFreeSpaceLabel) + 1, mTorrentFilesView);
-        } else {
+        }
+
+        mEditLabelsGroupBox = new QGroupBox(qApp->translate("tremotesf", "Labels"), this);
+        layout->addRow(mEditLabelsGroupBox);
+        auto labelsGroupBoxLayout = new QVBoxLayout(mEditLabelsGroupBox);
+        mEditLabelsWidget = new EditLabelsWidget({}, mRpc, this);
+        labelsGroupBoxLayout->addWidget(mEditLabelsWidget);
+
+        if (!isAddingFile()) {
             layout->addItem(new QSpacerItem(0, 0, QSizePolicy::Minimum, QSizePolicy::Expanding));
         }
 
         mDialogButtonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
-        QObject::connect(mDialogButtonBox, &QDialogButtonBox::accepted, this, &AddTorrentDialog::accept);
+        QObject::connect(mDialogButtonBox, &QDialogButtonBox::accepted, this, [this] {
+            if (!mEditLabelsWidget->comboBoxHasFocus()) {
+                accept();
+            }
+        });
         QObject::connect(mDialogButtonBox, &QDialogButtonBox::rejected, this, &AddTorrentDialog::reject);
         layout->addRow(mDialogButtonBox);
 
@@ -311,6 +328,10 @@ namespace tremotesf {
             mMessageWidget->setText(qApp->translate("tremotesf", "Disconnected"));
             mMessageWidget->animatedShow();
         }
+
+        mEditLabelsGroupBox->setVisible(
+            mRpc->isConnected() ? mRpc->serverSettings()->data().hasLabelsProperty() : true
+        );
 
         canAcceptUpdate();
     }
@@ -457,11 +478,11 @@ namespace tremotesf {
     void AddTorrentDialog::AddTorrentParametersWidgets::saveToSettings() const {
         downloadDirectoryWidget->saveDirectories();
         auto* const settings = Settings::instance();
-        settings->setLastAddTorrentPriority(priorityFromComboBoxIndex(priorityComboBox->currentIndex()));
-        settings->setLastAddTorrentStartAfterAdding(startTorrentCheckBox->isChecked());
+        settings->set_lastAddTorrentPriority(priorityFromComboBoxIndex(priorityComboBox->currentIndex()));
+        settings->set_lastAddTorrentStartAfterAdding(startTorrentCheckBox->isChecked());
         if (deleteTorrentFileGroupBox) {
-            settings->setLastAddTorrentDeleteTorrentFile(deleteTorrentFileGroupBox->isChecked());
-            settings->setLastAddTorrentMoveTorrentFileToTrash(moveTorrentFileToTrashCheckBox->isChecked());
+            settings->set_lastAddTorrentDeleteTorrentFile(deleteTorrentFileGroupBox->isChecked());
+            settings->set_lastAddTorrentMoveTorrentFileToTrash(moveTorrentFileToTrashCheckBox->isChecked());
         }
     }
 

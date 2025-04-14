@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.8.1] - 2025-04-12
+### Fixed
+- Not working file dialogs when installed through Flatpak
+
+## [2.8.0] - 2025-04-09
+### Added
+- Option to show torrent properties in a panel in the main window instead of dialog
+- Ability to set labels on torrents and filter torrent list by labels
+- Option to display relative time
+- Option to display only names of download directories in sidebar and torrents list
+
+### Changed
+- Options dialog is rearranged to use multiple tabs
+- Message that's shown when trying to add torrent while disconnected from server is now displayed in a dialog instead of main window
+
+### Fixed
+- Delayed loading of peers for active torrents
+- Window activation from clicking on notification
+
 ## [2.7.5] - 2025-01-14
 ### Added
 - Windows on ARM64 support
