@@ -100,6 +100,10 @@ namespace tremotesf {
 
     bool ServerSettingsData::hasTrackerListProperty() const { return (rpcVersion >= 17); }
 
+    bool ServerSettingsData::hasFileCountProperty() const { return (rpcVersion >= 17); }
+
+    bool ServerSettingsData::hasLabelsProperty() const { return (rpcVersion >= 16); }
+
     ServerSettings::ServerSettings(Rpc* rpc, QObject* parent) : QObject(parent), mRpc(rpc), mSaveOnSet(true) {}
 
     void ServerSettings::setDownloadDirectory(const QString& directory) {

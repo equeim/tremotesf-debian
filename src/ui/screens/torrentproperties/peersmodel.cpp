@@ -16,8 +16,6 @@
 #include "stdutils.h"
 
 namespace tremotesf {
-    PeersModel::PeersModel(Torrent* torrent, QObject* parent) : QAbstractTableModel(parent) { setTorrent(torrent); }
-
     PeersModel::~PeersModel() {
         if (mTorrent) {
             mTorrent->setPeersEnabled(false);
@@ -111,36 +109,28 @@ namespace tremotesf {
 
     int PeersModel::rowCount(const QModelIndex&) const { return static_cast<int>(mPeers.size()); }
 
-    bool PeersModel::removeRows(int row, int count, const QModelIndex& parent) {
-        beginRemoveRows(parent, row, row + count - 1);
-        const auto first(mPeers.begin() + row);
-        mPeers.erase(first, first + count);
-        endRemoveRows();
-        return true;
-    }
-
     Torrent* PeersModel::torrent() const { return mTorrent; }
 
-    void PeersModel::setTorrent(Torrent* torrent) {
-        if (torrent != mTorrent) {
-            if (const auto oldTorrent = mTorrent.data(); oldTorrent) {
-                QObject::disconnect(oldTorrent, nullptr, this, nullptr);
-            }
-
-            mTorrent = torrent;
-
-            if (mTorrent) {
-                QObject::connect(mTorrent, &Torrent::peersUpdated, this, &PeersModel::update);
-                if (mTorrent->isPeersEnabled()) {
-                    warning().log("{} already has enabled peers, this shouldn't happen", *mTorrent);
-                }
-                mTorrent->setPeersEnabled(true);
-            } else {
-                beginResetModel();
-                mPeers.clear();
-                endResetModel();
-            }
+    void PeersModel::setTorrent(Torrent* torrent, bool oldTorrentDestroyed) {
+        if (torrent == mTorrent) {
+            return;
         }
+        if (mTorrent && !oldTorrentDestroyed) {
+            QObject::disconnect(mTorrent, nullptr, this, nullptr);
+            mTorrent->setPeersEnabled(false);
+        }
+        mTorrent = torrent;
+        beginResetModel();
+        mPeers.clear();
+        if (mTorrent) {
+            if (mTorrent->isPeersEnabled()) {
+                warning().log("{} already has enabled peers, this shouldn't happen", *mTorrent);
+            }
+            mTorrent->setPeersEnabled(true);
+            QObject::connect(mTorrent, &Torrent::peersUpdated, this, &PeersModel::update);
+            QObject::connect(mTorrent, &QObject::destroyed, this, [this] { setTorrent(nullptr, true); });
+        }
+        endResetModel();
     }
 
     void PeersModel::update(

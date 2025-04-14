@@ -85,6 +85,8 @@ target_sources(tremotesf_objects
     ui/screens/mainwindow/alltrackersmodel.cpp
     ui/screens/mainwindow/basetorrentsfilterssettingsmodel.cpp
     ui/screens/mainwindow/downloaddirectoriesmodel.cpp
+    ui/screens/mainwindow/editlabelsdialog.cpp
+    ui/screens/mainwindow/labelsmodel.cpp
     ui/screens/mainwindow/mainwindow.cpp
     ui/screens/mainwindow/mainwindowsidebar.cpp
     ui/screens/mainwindow/mainwindowstatusbar.cpp
@@ -99,11 +101,14 @@ target_sources(tremotesf_objects
     ui/screens/torrentproperties/peersmodel.cpp
     ui/screens/torrentproperties/torrentfilesmodel.cpp
     ui/screens/torrentproperties/torrentpropertiesdialog.cpp
+    ui/screens/torrentproperties/torrentpropertieswidget.cpp
     ui/screens/torrentproperties/trackersmodel.cpp
     ui/screens/torrentproperties/trackersviewwidget.cpp
     ui/stylehelpers.cpp
     ui/widgets/basetreeview.cpp
     ui/widgets/commondelegate.cpp
+    ui/widgets/editlabelswidget.cpp
+    ui/widgets/listplaceholder.cpp
     ui/widgets/remotedirectoryselectionwidget.cpp
     ui/widgets/textinputdialog.cpp
     ui/widgets/torrentfilesview.cpp
@@ -186,6 +191,8 @@ target_sources(tremotesf_objects
     ui/screens/mainwindow/alltrackersmodel.h
     ui/screens/mainwindow/basetorrentsfilterssettingsmodel.h
     ui/screens/mainwindow/downloaddirectoriesmodel.h
+    ui/screens/mainwindow/editlabelsdialog.h
+    ui/screens/mainwindow/labelsmodel.h
     ui/screens/mainwindow/mainwindow.h
     ui/screens/mainwindow/mainwindowsidebar.h
     ui/screens/mainwindow/mainwindowstatusbar.h
@@ -200,12 +207,15 @@ target_sources(tremotesf_objects
     ui/screens/torrentproperties/peersmodel.h
     ui/screens/torrentproperties/torrentfilesmodel.h
     ui/screens/torrentproperties/torrentpropertiesdialog.h
+    ui/screens/torrentproperties/torrentpropertieswidget.h
     ui/screens/torrentproperties/trackersmodel.h
     ui/screens/torrentproperties/trackersviewwidget.h
     ui/stylehelpers.h
     ui/systemcolorsprovider.h
     ui/widgets/basetreeview.h
     ui/widgets/commondelegate.h
+    ui/widgets/editlabelswidget.h
+    ui/widgets/listplaceholder.h
     ui/widgets/remotedirectoryselectionwidget.h
     ui/widgets/textinputdialog.h
     ui/widgets/torrentfilesview.h
@@ -419,7 +429,7 @@ if (WIN32 OR APPLE)
         QT_STATICPLUGIN
     )
     find_package(Qt${TREMOTESF_QT_VERSION_MAJOR} ${TREMOTESF_MINIMUM_QT_VERSION} REQUIRED COMPONENTS Svg)
-    target_link_libraries(tremotesf PUBLIC Qt::Svg)
+    target_link_libraries(tremotesf PUBLIC Qt::GuiPrivate Qt::Svg)
     set(exclude_plugins bearer iconengines imageformats)
     if (WIN32)
         list(APPEND exclude_plugins styles)

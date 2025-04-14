@@ -14,23 +14,14 @@ namespace tremotesf {
         Q_OBJECT
 
     public:
-        static constexpr auto DirectoryRole = Qt::UserRole;
+        enum class Role { Directory = Qt::UserRole, AlwaysShowTooltip };
 
-        inline explicit DownloadDirectoriesModel(QObject* parent = nullptr)
-            : BaseTorrentsFiltersSettingsModel(parent){};
+        explicit DownloadDirectoriesModel(QObject* parent = nullptr);
 
         QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
         int rowCount(const QModelIndex& = {}) const override;
-        bool removeRows(int row, int count, const QModelIndex& parent = {}) override;
-
-        QModelIndex indexForDirectory(const QString& downloadDirectory) const;
 
         QModelIndex indexForTorrentsProxyModelFilter() const override;
-
-        using QAbstractItemModel::beginInsertRows;
-        using QAbstractItemModel::beginRemoveRows;
-        using QAbstractItemModel::endInsertRows;
-        using QAbstractItemModel::endRemoveRows;
 
         struct DirectoryItem {
             QString directory{};
@@ -45,6 +36,7 @@ namespace tremotesf {
         void update() override;
 
         std::vector<DirectoryItem> mDirectories{};
+        bool mDisplayFullDownloadDirectoryPath{};
     };
 }
 

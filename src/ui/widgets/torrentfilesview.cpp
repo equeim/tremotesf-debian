@@ -7,7 +7,6 @@
 #include <QAction>
 #include <QActionGroup>
 #include <QCoreApplication>
-#include <QCursor>
 #include <QHeaderView>
 #include <QItemSelectionModel>
 #include <QMenu>
@@ -38,7 +37,7 @@ namespace tremotesf {
           mRpc(rpc) {
         init();
         setItemDelegate(new CommonDelegate(this));
-        if (!header()->restoreState(Settings::instance()->localTorrentFilesViewHeaderState())) {
+        if (!header()->restoreState(Settings::instance()->get_localTorrentFilesViewHeaderState())) {
             sortByColumn(static_cast<int>(LocalTorrentFilesModel::Column::Name), Qt::AscendingOrder);
         }
     }
@@ -53,12 +52,13 @@ namespace tremotesf {
           mRpc(rpc) {
         init();
         setItemDelegate(new CommonDelegate(
-            static_cast<int>(TorrentFilesModel::Column::ProgressBar),
-            TorrentFilesModel::SortRole,
-            std::nullopt,
+            {
+                .progressBarColumn = static_cast<int>(TorrentFilesModel::Column::ProgressBar),
+                .progressRole = TorrentFilesModel::SortRole,
+            },
             this
         ));
-        if (!header()->restoreState(Settings::instance()->torrentFilesViewHeaderState())) {
+        if (!header()->restoreState(Settings::instance()->get_torrentFilesViewHeaderState())) {
             sortByColumn(static_cast<int>(TorrentFilesModel::Column::Name), Qt::AscendingOrder);
         }
 
@@ -93,9 +93,9 @@ namespace tremotesf {
 
     void TorrentFilesView::saveState() {
         if (mLocalFile) {
-            Settings::instance()->setLocalTorrentFilesViewHeaderState(header()->saveState());
+            Settings::instance()->set_localTorrentFilesViewHeaderState(header()->saveState());
         } else {
-            Settings::instance()->setTorrentFilesViewHeaderState(header()->saveState());
+            Settings::instance()->set_torrentFilesViewHeaderState(header()->saveState());
         }
     }
 
@@ -275,6 +275,6 @@ namespace tremotesf {
             });
         }
 
-        contextMenu.exec(QCursor::pos());
+        contextMenu.exec(viewport()->mapToGlobal(pos));
     }
 }

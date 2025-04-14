@@ -115,7 +115,7 @@ namespace tremotesf {
                         return DWMWINDOWATTRIBUTE_compat::DWMWA_USE_IMMERSIVE_DARK_MODE_1809_UNTIL_2004;
                     }();
                     const bool darkTheme = [&] {
-                        switch (Settings::instance()->darkThemeMode()) {
+                        switch (Settings::instance()->get_darkThemeMode()) {
                         case Settings::DarkThemeMode::FollowSystem:
                             return mSystemColorsProvider->isDarkThemeEnabled();
                         case Settings::DarkThemeMode::On:
@@ -192,7 +192,7 @@ namespace tremotesf {
         void applyAccentToPalette(Settings* settings, SystemColorsProvider* systemColorsProvider) {
             info().log("Applying accent colors to palette");
             SystemColorsProvider::AccentColors accentColors;
-            if (settings->useSystemAccentColor()) {
+            if (settings->get_useSystemAccentColor()) {
                 accentColors = systemColorsProvider->accentColors();
                 if (!accentColors.isValid()) {
                     accentColors = defaultAccentColors;
@@ -218,6 +218,9 @@ namespace tremotesf {
                 withAlpha(palette.color(QPalette::Active, QPalette::Highlight), 153)
             );
             palette.setColor(QPalette::Inactive, QPalette::HighlightedText, Qt::white);
+            palette.setColor(QPalette::Active, QPalette::Accent, palette.color(QPalette::Active, QPalette::Highlight));
+            palette
+                .setColor(QPalette::Disabled, QPalette::Accent, palette.color(QPalette::Disabled, QPalette::Highlight));
 
             QGuiApplication::setPalette(palette);
             if (qApp->styleHints()->colorScheme() == Qt::ColorScheme::Dark) {
@@ -235,7 +238,7 @@ namespace tremotesf {
         const auto settings = Settings::instance();
         const auto apply = [=] {
             const bool darkTheme = [&] {
-                switch (settings->darkThemeMode()) {
+                switch (settings->get_darkThemeMode()) {
                 case Settings::DarkThemeMode::FollowSystem:
                     return systemColorsProvider->isDarkThemeEnabled();
                 case Settings::DarkThemeMode::On:

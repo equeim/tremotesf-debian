@@ -8,7 +8,6 @@
 #include <vector>
 
 #include <QAbstractTableModel>
-#include <QPointer>
 
 #include "rpc/peer.h"
 
@@ -26,7 +25,7 @@ namespace tremotesf {
 
         static constexpr auto SortRole = Qt::UserRole;
 
-        explicit PeersModel(Torrent* torrent = nullptr, QObject* parent = nullptr);
+        inline explicit PeersModel(QObject* parent = nullptr) : QAbstractTableModel(parent) {}
         ~PeersModel() override;
         Q_DISABLE_COPY_MOVE(PeersModel)
 
@@ -34,10 +33,9 @@ namespace tremotesf {
         QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
         QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
         int rowCount(const QModelIndex&) const override;
-        bool removeRows(int row, int count, const QModelIndex& parent = {}) override;
 
         Torrent* torrent() const;
-        void setTorrent(Torrent* torrent);
+        void setTorrent(Torrent* torrent, bool oldTorrentDestroyed);
 
     private:
         void update(
@@ -47,7 +45,7 @@ namespace tremotesf {
         );
 
         std::vector<Peer> mPeers{};
-        QPointer<Torrent> mTorrent{};
+        Torrent* mTorrent{};
     };
 }
 
