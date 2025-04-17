@@ -8,14 +8,14 @@ Build-Depends: cmake,
                libcpp-httplib-dev,
                libcxxopts-dev,
                libfmt-dev,
-               libkf5widgetsaddons-dev,
-               libkf5windowsystem-dev,
+               libkf6widgetsaddons-dev,
+               libkf6windowsystem-dev,
                libpsl-dev,
                libssl-dev,
                ninja-build,
                pkgconf,
-               qtbase5-dev,
-               qttools5-dev,
+               qt6-base-dev,
+               qt6-tools-dev,
 Standards-Version: 4.6.2
 Homepage: https://github.com/equeim/tremotesf2
 Vcs-Git: https://salsa.debian.org/debian/tremotesf.git

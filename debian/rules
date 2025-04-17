@@ -4,4 +4,4 @@
 	dh $@ --buildsystem=cmake
 
 override_dh_auto_configure:
-	dh_auto_configure -- -DTREMOTESF_WITH_HTTPLIB=system -DTREMOTESF_QT6=off
+	dh_auto_configure -- -DTREMOTESF_WITH_HTTPLIB=system
