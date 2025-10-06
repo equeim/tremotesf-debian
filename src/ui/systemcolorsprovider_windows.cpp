@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -28,15 +28,15 @@ namespace tremotesf {
             explicit SystemColorsProviderWindows(QObject* parent = nullptr) : SystemColorsProvider(parent) {
                 info().log("System dark theme enabled = {}", mDarkThemeEnabled);
                 info().log("System accent colors = {}", mAccentColors);
-                revoker = settings.ColorValuesChanged(winrt::auto_revoke, [this](auto...) {
+                revoker = settings.ColorValuesChanged(winrt::auto_revoke, [this](auto&&...) {
                     QMetaObject::invokeMethod(this, [this] {
-                        if (bool newDarkThemeEnabled = isDarkThemeEnabledImpl();
+                        if (const bool newDarkThemeEnabled = isDarkThemeEnabledImpl();
                             newDarkThemeEnabled != mDarkThemeEnabled) {
                             info().log("System dark theme state changed to {}", newDarkThemeEnabled);
                             mDarkThemeEnabled = newDarkThemeEnabled;
                             emit darkThemeEnabledChanged();
                         }
-                        if (auto newAccentColors = accentColorsImpl(); newAccentColors != mAccentColors) {
+                        if (const auto newAccentColors = accentColorsImpl(); newAccentColors != mAccentColors) {
                             info().log("System accent colors changed to {}", newAccentColors);
                             mAccentColors = newAccentColors;
                             emit accentColorsChanged();

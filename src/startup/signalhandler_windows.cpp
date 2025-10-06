@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -14,6 +14,7 @@
 
 namespace tremotesf {
     namespace {
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
         std::atomic_bool exitRequested{};
 
         BOOL WINAPI consoleHandler(DWORD dwCtrlType) {

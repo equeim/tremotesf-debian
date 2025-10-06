@@ -1,34 +1,36 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <ranges>
 
-#include "torrentfilesmodelentry.h"
-
 #include <QCoreApplication>
+#include <QMimeDatabase>
+
+#include "desktoputils.h"
+#include "torrentfilesmodelentry.h"
 
 namespace tremotesf {
     TorrentFilesModelEntry::Priority TorrentFilesModelEntry::fromFilePriority(TorrentFile::Priority priority) {
         switch (priority) {
         case TorrentFile::Priority::Low:
-            return LowPriority;
+            return Priority::Low;
         case TorrentFile::Priority::Normal:
-            return NormalPriority;
+            return Priority::Normal;
         case TorrentFile::Priority::High:
-            return HighPriority;
+            return Priority::High;
         default:
-            return NormalPriority;
+            return Priority::Normal;
         }
     }
 
     TorrentFile::Priority TorrentFilesModelEntry::toFilePriority(TorrentFilesModelEntry::Priority priority) {
         switch (priority) {
-        case LowPriority:
+        case Priority::Low:
             return TorrentFile::Priority::Low;
-        case NormalPriority:
+        case Priority::Normal:
             return TorrentFile::Priority::Normal;
-        case HighPriority:
+        case Priority::High:
             return TorrentFile::Priority::High;
         default:
             return TorrentFile::Priority::Normal;
@@ -48,7 +50,7 @@ namespace tremotesf {
 
     QString TorrentFilesModelEntry::path() const {
         QString path(mName);
-        TorrentFilesModelDirectory* parent = mParentDirectory;
+        const auto* parent = mParentDirectory;
         while (parent && !parent->name().isEmpty()) {
             path.prepend('/');
             path.prepend(parent->name());
@@ -59,16 +61,16 @@ namespace tremotesf {
 
     QString TorrentFilesModelEntry::priorityString() const {
         switch (priority()) {
-        case LowPriority:
+        case Priority::Low:
             //: Torrent's file loading priority
             return qApp->translate("tremotesf", "Low");
-        case NormalPriority:
+        case Priority::Normal:
             //: Torrent's file loading priority
             return qApp->translate("tremotesf", "Normal");
-        case HighPriority:
+        case Priority::High:
             //: Torrent's file loading priority
             return qApp->translate("tremotesf", "High");
-        case MixedPriority:
+        case Priority::Mixed:
             //: Torrent's file loading priority
             return qApp->translate("tremotesf", "Mixed");
         }
@@ -111,7 +113,7 @@ namespace tremotesf {
         if (mChildren.size() > 1) {
             for (const auto& child : mChildren | std::views::drop(1)) {
                 if (child->wantedState() != first) {
-                    return MixedWanted;
+                    return WantedState::Mixed;
                 }
             }
         }
@@ -129,7 +131,7 @@ namespace tremotesf {
         if (mChildren.size() > 1) {
             for (const auto& child : mChildren | std::views::drop(1)) {
                 if (child->priority() != first) {
-                    return MixedPriority;
+                    return Priority::Mixed;
                 }
             }
         }
@@ -186,6 +188,8 @@ namespace tremotesf {
         return ids;
     }
 
+    QIcon tremotesf::TorrentFilesModelDirectory::icon() const { return desktoputils::standardDirIcon(); }
+
     bool TorrentFilesModelDirectory::isChanged() const {
         return std::ranges::any_of(mChildren, [](const auto& child) { return child->isChanged(); });
     }
@@ -201,9 +205,10 @@ namespace tremotesf {
         : TorrentFilesModelEntry(row, parentDirectory, name),
           mSize(size),
           mCompletedSize(0),
-          mWantedState(Unwanted),
-          mPriority(NormalPriority),
+          mWantedState(WantedState::Unwanted),
+          mPriority(Priority::Normal),
           mId(id),
+          mInitializedIcon(false),
           mChanged(false) {}
 
     bool TorrentFilesModelFile::isDirectory() const { return false; }
@@ -224,9 +229,9 @@ namespace tremotesf {
     void TorrentFilesModelFile::setWanted(bool wanted) {
         WantedState wantedState{};
         if (wanted) {
-            wantedState = Wanted;
+            wantedState = WantedState::Wanted;
         } else {
-            wantedState = Unwanted;
+            wantedState = WantedState::Unwanted;
         }
         if (wantedState != mWantedState) {
             mWantedState = wantedState;
@@ -240,6 +245,31 @@ namespace tremotesf {
         if (priority != mPriority) {
             mPriority = priority;
         }
+    }
+
+    namespace {
+        QIcon determineFileIcon(const QString& fileName) {
+            static const QMimeDatabase mimeDb{};
+            const auto mimeType = mimeDb.mimeTypeForFile(fileName, QMimeDatabase::MatchExtension);
+            if (!mimeType.isValid()) {
+                return desktoputils::standardFileIcon();
+            }
+            if (const auto icon = QIcon::fromTheme(mimeType.iconName()); !icon.isNull()) {
+                return icon;
+            }
+            if (const auto icon = QIcon::fromTheme(mimeType.genericIconName()); !icon.isNull()) {
+                return icon;
+            }
+            return desktoputils::standardFileIcon();
+        }
+    }
+
+    QIcon TorrentFilesModelFile::icon() const {
+        if (!mInitializedIcon) {
+            mIcon = determineFileIcon(name());
+            mInitializedIcon = true;
+        }
+        return mIcon;
     }
 
     bool TorrentFilesModelFile::isChanged() const { return mChanged; }

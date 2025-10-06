@@ -1,11 +1,13 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "torrentpropertieswidget.h"
 
-#include <fmt/format.h>
+#include <array>
 #include <limits>
+
+#include <fmt/format.h>
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -29,7 +31,6 @@
 
 #include "desktoputils.h"
 #include "formatutils.h"
-#include "log/log.h"
 #include "peersmodel.h"
 #include "settings.h"
 #include "stdutils.h"
@@ -42,22 +43,26 @@
 #include "ui/itemmodels/baseproxymodel.h"
 #include "ui/itemmodels/stringlistmodel.h"
 #include "ui/stylehelpers.h"
-#include "ui/widgets/commondelegate.h"
+#include "ui/widgets/basetreeview.h"
+#include "ui/widgets/progressbardelegate.h"
+#include "ui/widgets/tooltipwhenelideddelegate.h"
 #include "ui/widgets/torrentfilesview.h"
+
+using namespace Qt::StringLiterals;
 
 namespace tremotesf {
     namespace {
-        constexpr TorrentData::Priority priorityComboBoxItems[] = {
+        constexpr std::array priorityComboBoxItems{
             TorrentData::Priority::High, TorrentData::Priority::Normal, TorrentData::Priority::Low
         };
 
-        constexpr TorrentData::RatioLimitMode ratioLimitComboBoxItems[] = {
+        constexpr std::array ratioLimitComboBoxItems{
             TorrentData::RatioLimitMode::Global,
             TorrentData::RatioLimitMode::Unlimited,
             TorrentData::RatioLimitMode::Single
         };
 
-        constexpr TorrentData::IdleSeedingLimitMode idleSeedingLimitComboBoxItems[] = {
+        constexpr std::array idleSeedingLimitComboBoxItems{
             TorrentData::IdleSeedingLimitMode::Global,
             TorrentData::IdleSeedingLimitMode::Unlimited,
             TorrentData::IdleSeedingLimitMode::Single
@@ -186,7 +191,7 @@ namespace tremotesf {
         //: Torrent's comment text
         infoGroupBoxLayout->addRow(qApp->translate("tremotesf", "Comment:"), commentTextEdit);
 
-        auto labelsModel = new StringListModel({}, QIcon::fromTheme("tag"_l1), this);
+        auto labelsModel = new StringListModel({}, QIcon::fromTheme("tag"_L1), this);
         auto labelsProxyModel = new BaseProxyModel(labelsModel, Qt::DisplayRole, std::nullopt, this);
         auto labelsView = new QListView(this);
         labelsView->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Expanding);
@@ -286,14 +291,14 @@ namespace tremotesf {
         auto peersTab = new QWidget(this);
         auto peersTabLayout = new QVBoxLayout(peersTab);
 
-        mPeersView = new BaseTreeView(this);
-        mPeersView->setItemDelegate(new CommonDelegate(
-            {.progressBarColumn = static_cast<int>(PeersModel::Column::ProgressBar),
-             .progressRole = PeersModel::SortRole},
-            this
-        ));
+        mPeersView = new QTreeView(this);
+        setCommonTreeViewProperties(mPeersView, true);
+        mPeersView->setItemDelegate(new TooltipWhenElidedDelegate(this));
+        mPeersView->setItemDelegateForColumn(
+            static_cast<int>(PeersModel::Column::ProgressBar),
+            new ProgressBarDelegate(PeersModel::SortRole, this)
+        );
         mPeersView->setModel(peersProxyModel);
-        mPeersView->setRootIsDecorated(false);
         mPeersView->header()->restoreState(Settings::instance()->get_peersViewHeaderState());
         overrideBreezeFramelessScrollAreaHeuristic(mPeersView, true);
 
@@ -310,10 +315,10 @@ namespace tremotesf {
         auto webSeedersTab = new QWidget(this);
         auto webSeedersTabLayout = new QVBoxLayout(webSeedersTab);
 
-        auto webSeedersView = new BaseTreeView(this);
+        auto webSeedersView = new QTreeView(this);
+        setCommonTreeViewProperties(webSeedersView, true);
         webSeedersView->header()->setContextMenuPolicy(Qt::DefaultContextMenu);
         webSeedersView->setModel(webSeedersProxyModel);
-        webSeedersView->setRootIsDecorated(false);
         overrideBreezeFramelessScrollAreaHeuristic(webSeedersView, true);
 
         webSeedersTabLayout->addWidget(webSeedersView);
@@ -487,8 +492,8 @@ namespace tremotesf {
             static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
             this,
             [idleSeedingLimitSpinBox](int index) {
-                if (index ==
-                    indexOfCasted<int>(idleSeedingLimitComboBoxItems, TorrentData::IdleSeedingLimitMode::Single)) {
+                if (index
+                    == indexOfCasted<int>(idleSeedingLimitComboBoxItems, TorrentData::IdleSeedingLimitMode::Single)) {
                     idleSeedingLimitSpinBox->show();
                 } else {
                     idleSeedingLimitSpinBox->hide();
@@ -561,7 +566,7 @@ namespace tremotesf {
             this,
             [this](int index) {
                 if (!mUpdatingLimits && mTorrent) {
-                    mTorrent->setBandwidthPriority(priorityComboBoxItems[index]);
+                    mTorrent->setBandwidthPriority(priorityComboBoxItems.at(static_cast<size_t>(index)));
                 }
             }
         );
@@ -571,7 +576,7 @@ namespace tremotesf {
             this,
             [this](int index) {
                 if (!mUpdatingLimits && mTorrent) {
-                    mTorrent->setRatioLimitMode(ratioLimitComboBoxItems[index]);
+                    mTorrent->setRatioLimitMode(ratioLimitComboBoxItems.at(static_cast<size_t>(index)));
                 }
             }
         );
@@ -591,7 +596,7 @@ namespace tremotesf {
             this,
             [this](int index) {
                 if (!mUpdatingLimits && mTorrent) {
-                    mTorrent->setIdleSeedingLimitMode(idleSeedingLimitComboBoxItems[index]);
+                    mTorrent->setIdleSeedingLimitMode(idleSeedingLimitComboBoxItems.at(static_cast<size_t>(index)));
                 }
             }
         );

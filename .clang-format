@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+# SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 #
 # SPDX-License-Identifier: CC0-1.0
 
@@ -29,10 +29,11 @@ AttributeMacros: ['ALWAYS_INLINE', 'FORMAT_CONST']
 BinPackArguments: false
 BinPackParameters: false
 BitFieldColonSpacing: Both
-BreakBeforeBinaryOperators: None
+BreakBeforeBinaryOperators: NonAssignment
 BreakBeforeBraces: Attach
 BreakBeforeConceptDeclarations: Always
 BreakBeforeTernaryOperators: true
+BreakBinaryOperations: RespectPrecedence
 BreakConstructorInitializers: BeforeColon
 BreakInheritanceList: BeforeColon
 BreakStringLiterals: true

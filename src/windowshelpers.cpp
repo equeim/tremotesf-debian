@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -29,12 +29,13 @@ namespace tremotesf {
             const char* name() const noexcept override { return "Win32Category"; }
 
             std::string message(int code) const override {
-                wchar_t* wstr{};
+                const wchar_t* wstr{};
                 const auto size = FormatMessageW(
                     FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
                     nullptr,
                     static_cast<DWORD>(code),
                     MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
                     reinterpret_cast<wchar_t*>(&wstr),
                     0,
                     nullptr

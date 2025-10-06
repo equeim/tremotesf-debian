@@ -1,10 +1,11 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "torrentsmodel.h"
 
 #include <limits>
+#include <ranges>
 
 #include <QCoreApplication>
 #include <QIcon>
@@ -17,7 +18,6 @@
 #include "desktoputils.h"
 #include "formatutils.h"
 #include "settings.h"
-#include "stdutils.h"
 
 namespace tremotesf {
     TorrentsModel::TorrentsModel(Rpc* rpc, QObject* parent) : QAbstractTableModel(parent), mRpc(nullptr) {
@@ -40,33 +40,35 @@ namespace tremotesf {
         if (!index.isValid()) {
             return {};
         }
-        Torrent* torrent = mRpc->torrents().at(static_cast<size_t>(index.row())).get();
+        const auto* const torrent = mRpc->torrents().at(static_cast<size_t>(index.row())).get();
         switch (role) {
         case Qt::DecorationRole:
             if (static_cast<Column>(index.column()) == Column::Name) {
                 using namespace desktoputils;
+                using enum desktoputils::StatusIcon;
+
                 if (torrent->data().error != TorrentData::Error::None) {
-                    return statusIcon(ErroredIcon);
+                    return statusIcon(Errored);
                 }
                 switch (torrent->data().status) {
                 case TorrentData::Status::Paused:
-                    return statusIcon(PausedIcon);
+                    return statusIcon(Paused);
                 case TorrentData::Status::Seeding:
                     if (torrent->data().isSeedingStalled()) {
-                        return statusIcon(StalledSeedingIcon);
+                        return statusIcon(StalledSeeding);
                     }
-                    return statusIcon(SeedingIcon);
+                    return statusIcon(Seeding);
                 case TorrentData::Status::Downloading:
                     if (torrent->data().isDownloadingStalled()) {
-                        return statusIcon(StalledDownloadingIcon);
+                        return statusIcon(StalledDownloading);
                     }
-                    return statusIcon(DownloadingIcon);
+                    return statusIcon(Downloading);
                 case TorrentData::Status::QueuedForDownloading:
                 case TorrentData::Status::QueuedForSeeding:
-                    return statusIcon(QueuedIcon);
+                    return statusIcon(Queued);
                 case TorrentData::Status::Checking:
                 case TorrentData::Status::QueuedForChecking:
-                    return statusIcon(CheckingIcon);
+                    return statusIcon(Checking);
                 }
             }
             break;
@@ -279,14 +281,6 @@ namespace tremotesf {
             default:
                 return data(index, Qt::DisplayRole);
             }
-        case static_cast<int>(Role::TextElideMode):
-            if (static_cast<Column>(index.column()) == Column::DownloadDirectory) {
-                return Qt::ElideMiddle;
-            }
-            return Qt::ElideRight;
-        case static_cast<int>(Role::AlwaysShowTooltip):
-            return static_cast<Column>(index.column()) == Column::DownloadDirectory &&
-                   !mDisplayFullDownloadDirectoryPath;
         default:
             break;
         }
@@ -381,7 +375,7 @@ namespace tremotesf {
         }
     }
 
-    int TorrentsModel::rowCount(const QModelIndex&) const { return static_cast<int>(mRpc->torrentsCount()); }
+    int TorrentsModel::rowCount(const QModelIndex&) const { return mRpc->torrentsCount(); }
 
     Rpc* TorrentsModel::rpc() const { return mRpc; }
 
@@ -426,8 +420,8 @@ namespace tremotesf {
     Torrent* TorrentsModel::torrentAtRow(int row) const { return mRpc->torrents()[static_cast<size_t>(row)].get(); }
 
     std::vector<int> TorrentsModel::idsFromIndexes(const QModelIndexList& indexes) const {
-        return toContainer<std::vector>(indexes | std::views::transform([this](const QModelIndex& index) {
-                                            return torrentAtIndex(index)->data().id;
-                                        }));
+        return indexes
+               | std::views::transform([this](const QModelIndex& index) { return torrentAtIndex(index)->data().id; })
+               | std::ranges::to<std::vector>();
     }
 }

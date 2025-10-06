@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+# SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 #
 # SPDX-License-Identifier: CC0-1.0
 
@@ -9,16 +9,12 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
 find_package(Threads REQUIRED)
-find_package(fmt 9.1 REQUIRED)
-find_package(cxxopts 3.1.1 REQUIRED)
-find_package(Qt${TREMOTESF_QT_VERSION_MAJOR} ${TREMOTESF_MINIMUM_QT_VERSION} REQUIRED COMPONENTS Core Network Widgets)
+find_package(fmt 10.1.0 REQUIRED)
+find_package(cxxopts 3.2.1 REQUIRED)
+find_package(Qt6 ${TREMOTESF_MINIMUM_QT_VERSION} REQUIRED COMPONENTS Core Network Widgets)
 
-if (TREMOTESF_QT6)
-    set(minimum_kf_version 5.245)
-else()
-    set(minimum_kf_version 5.103)
-endif()
-find_package(KF${TREMOTESF_QT_VERSION_MAJOR}WidgetsAddons ${minimum_kf_version} REQUIRED)
+set(minimum_kf_version 6.11.0)
+find_package(KF6WidgetsAddons ${minimum_kf_version} REQUIRED)
 
 find_package(PkgConfig REQUIRED)
 
@@ -28,8 +24,6 @@ else ()
     set(registrable_domain_qt OFF)
     pkg_check_modules(libpsl REQUIRED IMPORTED_TARGET "libpsl >= 0.21.2")
 endif ()
-
-list(APPEND QRC_FILES resources.qrc)
 
 add_library(tremotesf_objects OBJECT)
 
@@ -56,6 +50,7 @@ target_sources(tremotesf_objects
     rpc/mounteddirectoriesutils.cpp
     rpc/pathutils.cpp
     rpc/peer.cpp
+    rpc/qsslcertificateformatter.cpp
     rpc/requestrouter.cpp
     rpc/rpc.cpp
     rpc/servers.cpp
@@ -85,6 +80,7 @@ target_sources(tremotesf_objects
     ui/screens/mainwindow/alltrackersmodel.cpp
     ui/screens/mainwindow/basetorrentsfilterssettingsmodel.cpp
     ui/screens/mainwindow/downloaddirectoriesmodel.cpp
+    ui/screens/mainwindow/downloaddirectorydelegate.cpp
     ui/screens/mainwindow/editlabelsdialog.cpp
     ui/screens/mainwindow/labelsmodel.cpp
     ui/screens/mainwindow/mainwindow.cpp
@@ -106,15 +102,17 @@ target_sources(tremotesf_objects
     ui/screens/torrentproperties/trackersviewwidget.cpp
     ui/stylehelpers.cpp
     ui/widgets/basetreeview.cpp
-    ui/widgets/commondelegate.cpp
+
     ui/widgets/editlabelswidget.cpp
     ui/widgets/listplaceholder.cpp
+    ui/widgets/progressbardelegate.cpp
     ui/widgets/remotedirectoryselectionwidget.cpp
     ui/widgets/textinputdialog.cpp
+    ui/widgets/tooltipwhenelideddelegate.cpp
     ui/widgets/torrentfilesview.cpp
     ui/widgets/torrentremotedirectoryselectionwidget.cpp
 
-    ${QRC_FILES}
+    resources.qrc
 
     PRIVATE FILE_SET HEADERS
     FILES
@@ -125,7 +123,6 @@ target_sources(tremotesf_objects
     fileutils.h
     formatutils.h
     itemlistupdater.h
-    literals.h
     magnetlinkparser.h
     pragmamacros.h
     settings.h
@@ -159,6 +156,7 @@ target_sources(tremotesf_objects
     rpc/mounteddirectoriesutils.h
     rpc/pathutils.h
     rpc/peer.h
+    rpc/qsslcertificateformatter.h
     rpc/requestrouter.h
     rpc/rpc.h
     rpc/servers.h
@@ -191,6 +189,7 @@ target_sources(tremotesf_objects
     ui/screens/mainwindow/alltrackersmodel.h
     ui/screens/mainwindow/basetorrentsfilterssettingsmodel.h
     ui/screens/mainwindow/downloaddirectoriesmodel.h
+    ui/screens/mainwindow/downloaddirectorydelegate.h
     ui/screens/mainwindow/editlabelsdialog.h
     ui/screens/mainwindow/labelsmodel.h
     ui/screens/mainwindow/mainwindow.h
@@ -213,16 +212,18 @@ target_sources(tremotesf_objects
     ui/stylehelpers.h
     ui/systemcolorsprovider.h
     ui/widgets/basetreeview.h
-    ui/widgets/commondelegate.h
+
     ui/widgets/editlabelswidget.h
     ui/widgets/listplaceholder.h
+    ui/widgets/progressbardelegate.h
     ui/widgets/remotedirectoryselectionwidget.h
     ui/widgets/textinputdialog.h
+    ui/widgets/tooltipwhenelideddelegate.h
     ui/widgets/torrentfilesview.h
     ui/widgets/torrentremotedirectoryselectionwidget.h
 )
 
-target_link_libraries(tremotesf_objects PUBLIC cxxopts::cxxopts Threads::Threads fmt::fmt Qt::Core Qt::Network Qt::Widgets KF${TREMOTESF_QT_VERSION_MAJOR}::WidgetsAddons)
+target_link_libraries(tremotesf_objects PUBLIC cxxopts::cxxopts Threads::Threads fmt::fmt Qt::Core Qt::Network Qt::Widgets KF6::WidgetsAddons)
 
 # We need these as CMake variables for configure_file() call below
 set(TREMOTESF_APP_NAME "Tremotesf")
@@ -251,9 +252,9 @@ if (UNIX)
         startup/signalhandler_unix.cpp
     )
     if (TREMOTESF_UNIX_FREEDESKTOP)
-        find_package(Qt${TREMOTESF_QT_VERSION_MAJOR} ${TREMOTESF_MINIMUM_QT_VERSION} REQUIRED COMPONENTS DBus)
-        find_package(KF${TREMOTESF_QT_VERSION_MAJOR}WindowSystem ${minimum_kf_version} REQUIRED)
-        target_link_libraries(tremotesf_objects PUBLIC Qt::DBus KF${TREMOTESF_QT_VERSION_MAJOR}::WindowSystem)
+        find_package(Qt6 ${TREMOTESF_MINIMUM_QT_VERSION} REQUIRED COMPONENTS DBus)
+        find_package(KF6WindowSystem ${minimum_kf_version} REQUIRED)
+        target_link_libraries(tremotesf_objects PUBLIC Qt::DBus KF6::WindowSystem)
 
         qt_add_dbus_adaptor(
             dbus_generated
@@ -387,8 +388,6 @@ if (WIN32)
         target_sources(tremotesf PRIVATE tremotesf.manifest.rc)
     endif ()
     if (MSVC)
-        # For C++23's std::stacktrace
-        set_source_files_properties(startup/windowsfatalerrorhandlers.cpp PROPERTIES COMPILE_OPTIONS "/std:c++latest")
         target_link_options(tremotesf PRIVATE "/PDBALTPATH:%_PDB%")
     endif()
     set_target_properties(tremotesf PROPERTIES WIN32_EXECUTABLE $<NOT:$<CONFIG:Debug>>)
@@ -424,11 +423,10 @@ if (WIN32 OR APPLE)
     target_compile_definitions(
         tremotesf
         PUBLIC
-        TREMOTESF_BUNDLED_ICON_THEME="${TREMOTESF_BUNDLED_ICON_THEME}"
         TREMOTESF_USE_BUNDLED_QT_TRANSLATIONS
         QT_STATICPLUGIN
     )
-    find_package(Qt${TREMOTESF_QT_VERSION_MAJOR} ${TREMOTESF_MINIMUM_QT_VERSION} REQUIRED COMPONENTS Svg)
+    find_package(Qt6 ${TREMOTESF_MINIMUM_QT_VERSION} REQUIRED COMPONENTS Svg)
     target_link_libraries(tremotesf PUBLIC Qt::GuiPrivate Qt::Svg)
     set(exclude_plugins bearer iconengines imageformats)
     if (WIN32)
@@ -438,7 +436,7 @@ if (WIN32 OR APPLE)
 endif ()
 
 if (BUILD_TESTING)
-    find_package(Qt${TREMOTESF_QT_VERSION_MAJOR} ${TREMOTESF_MINIMUM_QT_VERSION} REQUIRED COMPONENTS Test)
+    find_package(Qt6 ${TREMOTESF_MINIMUM_QT_VERSION} REQUIRED COMPONENTS Test)
 
     add_executable(itemlistupdater_test itemlistupdater_test.cpp)
     add_test(NAME itemlistupdater_test COMMAND itemlistupdater_test)
@@ -477,6 +475,11 @@ if (BUILD_TESTING)
     add_executable(servers_test rpc/servers_test.cpp)
     add_test(NAME servers_test COMMAND servers_test)
     target_link_libraries(servers_test PRIVATE tremotesf_objects Qt::Test)
+
+    add_executable(servers_migration_test rpc/servers_migration_test.cpp)
+    target_compile_definitions(servers_migration_test PRIVATE TEST_DATA_PATH="${CMAKE_CURRENT_SOURCE_DIR}/rpc/test-data")
+    add_test(NAME servers_migration_test COMMAND servers_migration_test)
+    target_link_libraries(servers_migration_test PRIVATE tremotesf_objects Qt::Test)
 
     add_executable(coroutines_test coroutines/coroutines_test.cpp)
     add_test(NAME coroutines_test COMMAND coroutines_test)

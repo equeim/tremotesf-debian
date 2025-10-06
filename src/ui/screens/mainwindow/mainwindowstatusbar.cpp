@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -19,6 +19,8 @@
 #include "rpc/rpc.h"
 #include "formatutils.h"
 
+using namespace Qt::StringLiterals;
+
 namespace tremotesf {
     MainWindowStatusBar::MainWindowStatusBar(const Rpc* rpc, QWidget* parent) : QStatusBar(parent), mRpc(rpc) {
         setSizeGripEnabled(false);
@@ -34,7 +36,7 @@ namespace tremotesf {
         layout->setContentsMargins(8, 0, 8, 0);
 
         mNoServersErrorImage = new QLabel(this);
-        mNoServersErrorImage->setPixmap(QIcon::fromTheme("dialog-error"_l1).pixmap(16, 16));
+        mNoServersErrorImage->setPixmap(QIcon::fromTheme("dialog-error"_L1).pixmap(16, 16));
         mNoServersErrorImage->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
         layout->addWidget(mNoServersErrorImage);
 
@@ -52,7 +54,7 @@ namespace tremotesf {
         layout->addWidget(mSecondSeparator);
 
         mDownloadSpeedImage = new QLabel(this);
-        mDownloadSpeedImage->setPixmap(QIcon::fromTheme("go-down"_l1).pixmap(16, 16));
+        mDownloadSpeedImage->setPixmap(QIcon::fromTheme("go-down"_L1).pixmap(16, 16));
         mDownloadSpeedImage->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
         layout->addWidget(mDownloadSpeedImage);
 
@@ -63,7 +65,7 @@ namespace tremotesf {
         layout->addWidget(mThirdSeparator);
 
         mUploadSpeedImage = new QLabel(this);
-        mUploadSpeedImage->setPixmap(QIcon::fromTheme("go-up"_l1).pixmap(16, 16));
+        mUploadSpeedImage->setPixmap(QIcon::fromTheme("go-up"_L1).pixmap(16, 16));
         mUploadSpeedImage->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
         layout->addWidget(mUploadSpeedImage);
 
@@ -134,10 +136,10 @@ namespace tremotesf {
 
     void MainWindowStatusBar::updateServerLabel() {
         if (Servers::instance()->hasServers()) {
-            mServerLabel->setText(QString::fromLatin1("%1 (%2)").arg(
-                Servers::instance()->currentServerName(),
-                Servers::instance()->currentServerAddress()
-            ));
+            mServerLabel->setText(
+                QString("%1 (%2)"_L1)
+                    .arg(Servers::instance()->currentServerName(), Servers::instance()->currentServerAddress())
+            );
         } else {
             mServerLabel->setText(qApp->translate("tremotesf", "No servers"));
         }
@@ -170,7 +172,7 @@ namespace tremotesf {
         }
         menu->addSeparator();
         auto* const connectionSettingsAction = menu->addAction(
-            QIcon::fromTheme("network-server"_l1),
+            QIcon::fromTheme("network-server"_L1),
             qApp->translate("tremotesf", "&Connection Settings")
         );
         QObject::connect(menu, &QMenu::triggered, this, [this, connectionSettingsAction](QAction* action) {
@@ -179,8 +181,7 @@ namespace tremotesf {
             } else {
                 const auto selectedName = action->data().toString();
                 const auto servers = Servers::instance()->servers();
-                const auto found = std::ranges::find(servers, selectedName, &Server::name);
-                if (found != servers.end()) {
+                if (std::ranges::contains(servers, selectedName, &Server::name)) {
                     Servers::instance()->setCurrentServer(selectedName);
                 } else {
                     warning().log("Selected server {} which no longer exists", selectedName);

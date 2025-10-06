@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+# SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 #
 # SPDX-License-Identifier: CC0-1.0
 
@@ -6,14 +6,8 @@
 
 %global app_id org.equeim.Tremotesf
 
-%if %{defined suse_version} || 0%{?fedora} >= 40
-%global qt_version 6
-%else
-%global qt_version 5
-%endif
-
 Name:       tremotesf
-Version:    2.8.2
+Version:    2.9.0
 Release:    1%{!?suse_version:%{?dist}}
 Summary:    Remote GUI for transmission-daemon
 %if %{defined suse_version}
@@ -32,16 +26,16 @@ BuildRequires: desktop-file-utils
 BuildRequires: gettext
 BuildRequires: make
 BuildRequires: zstd
-BuildRequires: cmake(Qt%{qt_version})
-BuildRequires: cmake(Qt%{qt_version}Core)
-BuildRequires: cmake(Qt%{qt_version}DBus)
-BuildRequires: cmake(Qt%{qt_version}LinguistTools)
-BuildRequires: cmake(Qt%{qt_version}Network)
-BuildRequires: cmake(Qt%{qt_version}Test)
-BuildRequires: cmake(Qt%{qt_version}Widgets)
+BuildRequires: cmake(Qt6)
+BuildRequires: cmake(Qt6Core)
+BuildRequires: cmake(Qt6DBus)
+BuildRequires: cmake(Qt6LinguistTools)
+BuildRequires: cmake(Qt6Network)
+BuildRequires: cmake(Qt6Test)
+BuildRequires: cmake(Qt6Widgets)
 BuildRequires: cmake(fmt)
-BuildRequires: cmake(KF%{qt_version}WidgetsAddons)
-BuildRequires: cmake(KF%{qt_version}WindowSystem)
+BuildRequires: cmake(KF6WidgetsAddons)
+BuildRequires: cmake(KF6WindowSystem)
 BuildRequires: cmake(cxxopts)
 BuildRequires: pkgconfig(libpsl)
 BuildRequires: openssl-devel
@@ -60,11 +54,8 @@ BuildRequires: gcc-c++
 BuildRequires: libasan
     %endif
   %endif
-Requires: qt%{qt_version}-qtsvg
+Requires: qt6-qtsvg
 Requires: breeze-icon-theme
-  %if %{qt_version} == 5
-Requires: kwayland-integration
-  %endif
   %global tremotesf_with_httplib system
 %endif
 
@@ -83,9 +74,6 @@ Requires: kf6-breeze-icons
 BuildRequires: appstream-util
 Requires: qtsvg5
 Requires: breeze-icons
-%if %{qt_version} == 5
-Requires: kwayland-integration
-%endif
 %global tremotesf_with_httplib bundled
 %endif
 
@@ -98,7 +86,7 @@ Remote GUI for Transmission BitTorrent client.
 
 
 %build
-%cmake -D TREMOTESF_QT6=%[%{qt_version} == 6 ? "ON" : "OFF"] -D TREMOTESF_WITH_HTTPLIB=%{tremotesf_with_httplib} -D TREMOTESF_ASAN=%{with asan}
+%cmake -D TREMOTESF_WITH_HTTPLIB=%{tremotesf_with_httplib} -D TREMOTESF_ASAN=%{with asan}
 %cmake_build
 
 %check
@@ -117,6 +105,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{app_id}.desktop
 %{_metainfodir}/%{app_id}.appdata.xml
 
 %changelog
+* Fri Oct 03 2025 Alexey Rochev <equeim@gmail.com> - 2.9.0-1
+- tremotesf-2.9.0
+
 * Wed Apr 16 2025 Alexey Rochev <equeim@gmail.com> - 2.8.2-1
 - tremotesf-2.8.2
 

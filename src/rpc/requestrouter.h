@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -8,6 +8,7 @@
 #include <chrono>
 #include <memory>
 #include <optional>
+#include <variant>
 
 #include <QJsonObject>
 #include <QList>
@@ -44,9 +45,18 @@ namespace tremotesf::impl {
         explicit RequestRouter(QObject* parent = nullptr);
 
         struct RequestsConfiguration {
+            struct SelfSignedCertificate {
+                QSslCertificate certificate{};
+            };
+
+            struct CustomRoot {
+                QSslCertificate rootCertificate{};
+                QSslCertificate leafCertificate{};
+            };
+
             QUrl serverUrl{};
             QNetworkProxy proxy{QNetworkProxy::applicationProxy()};
-            QList<QSslCertificate> serverCertificateChain{};
+            std::variant<std::monostate, SelfSignedCertificate, CustomRoot> serverCertificate{};
             QSslCertificate clientCertificate{};
             QSslKey clientPrivateKey{};
             std::chrono::milliseconds timeout{};
@@ -69,7 +79,7 @@ namespace tremotesf::impl {
 
         Coroutine<Response> postRequest(QLatin1String method, QByteArray data);
 
-        const QByteArray& sessionId() const { return mSessionId; };
+        QByteArrayView sessionId() const;
 
         void abortNetworkRequestsAndClearSessionId();
 
@@ -84,10 +94,8 @@ namespace tremotesf::impl {
         QNetworkAccessManager* mNetwork{};
         QThreadPool* mThreadPool{};
 
-        QByteArray mSessionId{};
-        QByteArray mAuthorizationHeaderValue{};
-
         std::optional<RequestsConfiguration> mConfiguration{};
+        QHttpHeaders mRequestHeaders{};
         QSslConfiguration mSslConfiguration{};
         QList<QSslError> mExpectedSslErrors{};
 
@@ -99,7 +107,7 @@ namespace tremotesf::impl {
          * @param errorMessage Short error message
          * @param detailedErrorMessage Detailed error message
          */
-        void requestFailed(RpcError error, const QString& errorMessage, const QString& detailedErrorMessage);
+        void requestFailed(tremotesf::RpcError error, const QString& errorMessage, const QString& detailedErrorMessage);
     };
 }
 

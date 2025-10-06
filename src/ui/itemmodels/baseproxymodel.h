@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -26,11 +26,7 @@ namespace tremotesf {
             QObject* parent = nullptr
         );
 
-        QModelIndex sourceIndex(const QModelIndex& proxyIndex) const;
-        QModelIndex sourceIndex(int proxyRow) const;
         QModelIndexList sourceIndexes(const QModelIndexList& proxyIndexes) const;
-
-        void sort(int column = 0, Qt::SortOrder order = Qt::AscendingOrder) override;
 
     protected:
         bool lessThan(const QModelIndex& source_left, const QModelIndex& source_right) const override;
@@ -40,9 +36,6 @@ namespace tremotesf {
 
         std::optional<int> mFallbackColumn{};
         QCollator mCollator{};
-
-    signals:
-        void sortOrderChanged();
     };
 }
 

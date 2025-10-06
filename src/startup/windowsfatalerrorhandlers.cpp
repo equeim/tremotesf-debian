@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -18,10 +18,11 @@
 
 #include <fmt/format.h>
 
-#include "literals.h"
 #include "windowsfatalerrorhandlers.h"
 #include "windowshelpers.h"
 #include "log/log.h"
+
+using namespace Qt::StringLiterals;
 
 namespace tremotesf {
     namespace {
@@ -53,7 +54,7 @@ namespace tremotesf {
             }
             const QFileInfo executable(executablePath);
             const auto executableDir = executable.path();
-            const QString pdbPath = executableDir % '/' % executable.completeBaseName() % ".pdb"_l1;
+            const QString pdbPath = executableDir % '/' % executable.completeBaseName() % ".pdb"_L1;
             if (!QFileInfo::exists(pdbPath)) {
                 fmt::format_to(
                     std::back_insert_iterator(report),
@@ -88,13 +89,13 @@ namespace tremotesf {
                 } catch (const std::exception& e) {
                     fmt::format_to(
                         std::back_insert_iterator(report),
-                        impl::singleArgumentFormatString,
+                        singleArgumentFormatString,
                         formatExceptionRecursively(e)
                     );
                 } catch (const winrt::hresult_error& e) {
                     fmt::format_to(
                         std::back_insert_iterator(report),
-                        impl::singleArgumentFormatString,
+                        singleArgumentFormatString,
                         formatExceptionRecursively(e)
                     );
                 } catch (...) {

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -33,8 +33,11 @@ namespace tremotesf::bencode {
     using Dictionary = std::map<ByteArray, Value, DictionaryComparator>;
 
     template<typename T>
-    concept ValueType = std::same_as<T, Integer> || std::same_as<T, ByteArray> || std::same_as<T, List> ||
-                        std::same_as<T, Dictionary> || std::same_as<T, QString>;
+    concept ValueType = std::same_as<T, Integer>
+                        || std::same_as<T, ByteArray>
+                        || std::same_as<T, List>
+                        || std::same_as<T, Dictionary>
+                        || std::same_as<T, QString>;
 
     template<ValueType ValueType>
     inline constexpr const char* getValueTypeName() {

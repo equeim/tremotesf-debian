@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -20,16 +20,15 @@ namespace tremotesf {
         void onAboutToQuit();
     };
 
-#if QT_VERSION_MAJOR >= 6
     class ApplicationQuitEventFilter : public QObject {
         Q_OBJECT
     public:
         explicit ApplicationQuitEventFilter(QObject* parent = nullptr);
         ~ApplicationQuitEventFilter() override;
+        Q_DISABLE_COPY_MOVE(ApplicationQuitEventFilter);
         bool eventFilter(QObject* watched, QEvent* event) override;
         bool isQuittingApplication{};
     };
-#endif
 
     class SaveWindowStateHandler : public QObject {
         Q_OBJECT
@@ -42,9 +41,7 @@ namespace tremotesf {
     private:
         QWidget* mWindow{};
         std::function<void()> mSaveState{};
-#if QT_VERSION_MAJOR >= 6
         ApplicationQuitEventFilter mApplicationEventFilter{};
-#endif
     };
 }
 

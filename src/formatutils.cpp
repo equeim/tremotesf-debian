@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -47,58 +47,67 @@ namespace tremotesf::formatutils {
 
         // Should be kept in sync with `enum ByteUnit`
         constexpr auto byteUnits = std::array{
-            ByteUnitStrings{//: Size suffix in bytes
-                            [] { return qApp->translate("tremotesf", "%L1 B"); },
-                            //: Download speed suffix in bytes per second
-                            [] { return qApp->translate("tremotesf", "%L1 B/s"); }
+            ByteUnitStrings{
+                //: Size suffix in bytes
+                .size = [] { return qApp->translate("tremotesf", "%L1 B"); },
+                //: Download speed suffix in bytes per second
+                .speed = [] { return qApp->translate("tremotesf", "%L1 B/s"); }
             },
             //: IEC 80000 binary prefixes, i.e. KiB = 1024 bytes
-            ByteUnitStrings{//: Size suffix in kibibytes
-                            [] { return qApp->translate("tremotesf", "%L1 KiB"); },
-                            //: Download speed suffix in kibibytes per second
-                            [] { return qApp->translate("tremotesf", "%L1 KiB/s"); }
+            ByteUnitStrings{
+                //: Size suffix in kibibytes
+                .size = [] { return qApp->translate("tremotesf", "%L1 KiB"); },
+                //: Download speed suffix in kibibytes per second
+                .speed = [] { return qApp->translate("tremotesf", "%L1 KiB/s"); }
             },
             //: IEC 80000 binary prefixes, i.e. KiB = 1024 bytes
-            ByteUnitStrings{//: Size suffix in mebibytes
-                            [] { return qApp->translate("tremotesf", "%L1 MiB"); },
-                            //: Download speed suffix in mebibytes per second
-                            [] { return qApp->translate("tremotesf", "%L1 MiB/s"); }
+            ByteUnitStrings{
+                //: Size suffix in mebibytes
+                .size = [] { return qApp->translate("tremotesf", "%L1 MiB"); },
+                //: Download speed suffix in mebibytes per second
+                .speed = [] { return qApp->translate("tremotesf", "%L1 MiB/s"); }
             },
             //: IEC 80000 binary prefixes, i.e. KiB = 1024 bytes
-            ByteUnitStrings{//: Size suffix in gibibytes
-                            [] { return qApp->translate("tremotesf", "%L1 GiB"); },
-                            //: Download speed suffix in gibibytes per second
-                            [] { return qApp->translate("tremotesf", "%L1 GiB/s"); }
+            ByteUnitStrings{
+                //: Size suffix in gibibytes
+                .size = [] { return qApp->translate("tremotesf", "%L1 GiB"); },
+                //: Download speed suffix in gibibytes per second
+                .speed = [] { return qApp->translate("tremotesf", "%L1 GiB/s"); }
             },
             //: IEC 80000 binary prefixes, i.e. KiB = 1024 bytes
-            ByteUnitStrings{//: Size suffix in tebibytes
-                            [] { return qApp->translate("tremotesf", "%L1 TiB"); },
-                            //: Download speed suffix in tebibytes per second
-                            [] { return qApp->translate("tremotesf", "%L1 TiB/s"); }
+            ByteUnitStrings{
+                //: Size suffix in tebibytes
+                .size = [] { return qApp->translate("tremotesf", "%L1 TiB"); },
+                //: Download speed suffix in tebibytes per second
+                .speed = [] { return qApp->translate("tremotesf", "%L1 TiB/s"); }
             },
             //: IEC 80000 binary prefixes, i.e. KiB = 1024 bytes
-            ByteUnitStrings{//: Size suffix in pebibytes
-                            [] { return qApp->translate("tremotesf", "%L1 PiB"); },
-                            //: Download speed suffix in pebibytes per second
-                            [] { return qApp->translate("tremotesf", "%L1 PiB/s"); }
+            ByteUnitStrings{
+                //: Size suffix in pebibytes
+                .size = [] { return qApp->translate("tremotesf", "%L1 PiB"); },
+                //: Download speed suffix in pebibytes per second
+                .speed = [] { return qApp->translate("tremotesf", "%L1 PiB/s"); }
             },
             //: IEC 80000 binary prefixes, i.e. KiB = 1024 bytes
-            ByteUnitStrings{//: Size suffix in exbibytes
-                            [] { return qApp->translate("tremotesf", "%L1 EiB"); },
-                            //: Download speed suffix in exbibytes per second
-                            [] { return qApp->translate("tremotesf", "%L1 EiB/s"); }
+            ByteUnitStrings{
+                //: Size suffix in exbibytes
+                .size = [] { return qApp->translate("tremotesf", "%L1 EiB"); },
+                //: Download speed suffix in exbibytes per second
+                .speed = [] { return qApp->translate("tremotesf", "%L1 EiB/s"); }
             },
             //: IEC 80000 binary prefixes, i.e. KiB = 1024 bytes
-            ByteUnitStrings{//: Size suffix in zebibytes
-                            [] { return qApp->translate("tremotesf", "%L1 ZiB"); },
-                            //: Download speed suffix in zebibytes per second
-                            [] { return qApp->translate("tremotesf", "%L1 ZiB/s"); }
+            ByteUnitStrings{
+                //: Size suffix in zebibytes
+                .size = [] { return qApp->translate("tremotesf", "%L1 ZiB"); },
+                //: Download speed suffix in zebibytes per second
+                .speed = [] { return qApp->translate("tremotesf", "%L1 ZiB/s"); }
             },
             //: IEC 80000 binary prefixes, i.e. KiB = 1024 bytes
-            ByteUnitStrings{//: Size suffix in yobibytes
-                            [] { return qApp->translate("tremotesf", "%L1 YiB"); },
-                            //: Download speed suffix in yobibytes per second
-                            [] { return qApp->translate("tremotesf", "%L1 YiB/s"); }
+            ByteUnitStrings{
+                //: Size suffix in yobibytes
+                .size = [] { return qApp->translate("tremotesf", "%L1 YiB"); },
+                //: Download speed suffix in yobibytes per second
+                .speed = [] { return qApp->translate("tremotesf", "%L1 YiB/s"); }
             },
         };
         constexpr size_t maxByteUnit = byteUnits.size() - 1;
@@ -191,7 +200,7 @@ namespace tremotesf::formatutils {
     namespace {
         // Adapted from KCoreAddons' KFormat
 
-        QString formatRelativeDate(const QDate& date, QLocale::FormatType format, const QLocale& locale) {
+        QString formatRelativeDate(QDate date, QLocale::FormatType format, const QLocale& locale) {
             if (!date.isValid()) {
                 return {};
             }
@@ -201,6 +210,7 @@ namespace tremotesf::formatutils {
                 return locale.toString(date, format);
             }
 
+            // NOLINTNEXTLINE(bugprone-switch-missing-default-case)
             switch (daysTo) {
             case 0:
                 return qApp->translate("tremotesf", "Today");
@@ -235,12 +245,11 @@ namespace tremotesf::formatutils {
                 if (minutesToNow <= 1) {
                     //: Relative time
                     return qApp->translate("tremotesf", "Just now");
-                } else {
-                    //: @item:intext %1 is a whole number
-                    //~ singular %n minute ago
-                    //~ plural %n minutes ago
-                    return qApp->translate("tremotesf", "%n minute(s) ago", nullptr, minutesToNow);
                 }
+                //: @item:intext %1 is a whole number
+                //~ singular %n minute ago
+                //~ plural %n minutes ago
+                return qApp->translate("tremotesf", "%n minute(s) ago", nullptr, minutesToNow);
             }
             return addTimeToDate(formatRelativeDate(dateTime.date(), format, locale), dateTime.time(), format, locale);
         }

@@ -1,7 +1,8 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <algorithm>
 #include <ranges>
 
 #include <QAbstractItemView>
@@ -12,19 +13,21 @@
 
 #include "torrentremotedirectoryselectionwidget.h"
 
-#include "stdutils.h"
 #include "rpc/rpc.h"
 #include "rpc/servers.h"
 #include "rpc/serversettings.h"
 
 namespace tremotesf {
-    void
-    TorrentDownloadDirectoryDirectorySelectionWidgetViewModel::saveDirectories(std::vector<ComboBoxItem> comboBoxItems
+    void TorrentDownloadDirectoryDirectorySelectionWidgetViewModel::saveDirectories(
+        std::vector<ComboBoxItem> comboBoxItems
     ) {
         if (mPath.isEmpty()) {
             return;
         }
-        auto paths = moveToContainer<QStringList>(comboBoxItems | std::views::transform(&ComboBoxItem::path));
+        auto paths = comboBoxItems
+                     | std::views::transform(&ComboBoxItem::path)
+                     | std::views::as_rvalue
+                     | std::ranges::to<QStringList>();
         if (!paths.contains(mPath)) {
             paths.push_back(mPath);
         }
@@ -56,18 +59,19 @@ namespace tremotesf {
         collator.setCaseSensitivity(Qt::CaseInsensitive);
         collator.setNumericMode(true);
         // QStringList is not compatibly with std::ranges::sort in Qt 5
-        std::sort(directories.begin(), directories.end(), [&collator](const auto& first, const auto& second) {
+        std::ranges::sort(directories, [&collator](const QString& first, const QString& second) {
             return collator.compare(first, second) < 0;
         });
 
-        auto ret =
-            toContainer<std::vector>(directories | std::views::transform([=, this](QString& dir) {
-                                         QString display = toNativeSeparators(dir);
-                                         return TorrentDownloadDirectoryDirectorySelectionWidgetViewModel::ComboBoxItem{
-                                             .path = std::move(dir),
-                                             .displayPath = std::move(display)
-                                         };
-                                     }));
+        auto ret = directories
+                   | std::views::transform([=, this](QString& dir) {
+                         QString display = toNativeSeparators(dir);
+                         return TorrentDownloadDirectoryDirectorySelectionWidgetViewModel::ComboBoxItem{
+                             .path = std::move(dir),
+                             .displayPath = std::move(display)
+                         };
+                     })
+                   | std::ranges::to<std::vector>();
         return ret;
     }
 
@@ -113,7 +117,7 @@ namespace tremotesf {
             updateItems
         );
 
-        QObject::connect(comboBox, qOverload<int>(&QComboBox::activated), this, [=](int index) {
+        QObject::connect(comboBox, &QComboBox::activated, this, [=](int index) {
             if (index != -1) {
                 viewModel->onComboBoxItemSelected(comboBox->itemData(index).toString(), comboBox->itemText(index));
             }
@@ -122,14 +126,14 @@ namespace tremotesf {
 
     void TorrentDownloadDirectoryDirectorySelectionWidget::saveDirectories() {
         auto comboBox = qobject_cast<QComboBox*>(mTextField);
-        auto comboBoxItems = toContainer<std::vector>(
-            std::views::iota(0, comboBox->count()) | std::views::transform([comboBox](int index) {
-                return TorrentDownloadDirectoryDirectorySelectionWidgetViewModel::ComboBoxItem{
-                    .path = comboBox->itemData(index).toString(),
-                    .displayPath = comboBox->itemText(index)
-                };
-            })
-        );
+        auto comboBoxItems = std::views::iota(0, comboBox->count())
+                             | std::views::transform([comboBox](int index) {
+                                   return TorrentDownloadDirectoryDirectorySelectionWidgetViewModel::ComboBoxItem{
+                                       .path = comboBox->itemData(index).toString(),
+                                       .displayPath = comboBox->itemText(index)
+                                   };
+                               })
+                             | std::ranges::to<std::vector>();
         qobject_cast<TorrentDownloadDirectoryDirectorySelectionWidgetViewModel*>(mViewModel)
             ->saveDirectories(std::move(comboBoxItems));
     }

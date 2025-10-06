@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -10,6 +10,7 @@
 #include <unordered_map>
 
 #include <QObject>
+#include <QIcon>
 
 #include "rpc/torrentfile.h"
 
@@ -19,10 +20,10 @@ namespace tremotesf {
     class TorrentFilesModelEntry {
         Q_GADGET
     public:
-        enum WantedState { Wanted, Unwanted, MixedWanted };
+        enum class WantedState { Wanted, Unwanted, Mixed };
         Q_ENUM(WantedState)
 
-        enum Priority { LowPriority, NormalPriority, HighPriority, MixedPriority };
+        enum class Priority { Low, Normal, High, Mixed };
         Q_ENUM(Priority)
 
         static Priority fromFilePriority(TorrentFile::Priority priority);
@@ -53,6 +54,8 @@ namespace tremotesf {
         virtual Priority priority() const = 0;
         QString priorityString() const;
         virtual void setPriority(Priority priority) = 0;
+
+        virtual QIcon icon() const = 0;
 
         virtual bool isChanged() const = 0;
 
@@ -87,6 +90,8 @@ namespace tremotesf {
         void clearChildren();
         std::vector<int> childrenIds() const;
 
+        QIcon icon() const override;
+
         bool isChanged() const override;
 
     private:
@@ -110,6 +115,7 @@ namespace tremotesf {
         void setWanted(bool wanted) override;
         Priority priority() const override;
         void setPriority(Priority priority) override;
+        QIcon icon() const override;
 
         bool isChanged() const override;
         void setChanged(bool changed);
@@ -123,7 +129,9 @@ namespace tremotesf {
         long long mCompletedSize;
         WantedState mWantedState;
         Priority mPriority;
+        mutable QIcon mIcon;
         int mId;
+        mutable bool mInitializedIcon;
 
         bool mChanged;
     };

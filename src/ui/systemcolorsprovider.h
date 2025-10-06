@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -27,8 +27,10 @@ namespace tremotesf {
             QColor accentColorDark2{};
 
             [[nodiscard]] bool isValid() const {
-                return accentColor.isValid() && accentColorLight1.isValid() && accentColorDark1.isValid() &&
-                       accentColorDark2.isValid();
+                return accentColor.isValid()
+                       && accentColorLight1.isValid()
+                       && accentColorDark1.isValid()
+                       && accentColorDark2.isValid();
             }
             [[nodiscard]] bool operator==(const AccentColors&) const = default;
         };

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -8,16 +8,14 @@
 #include "ipcserver.h"
 #include "ipcserver_dbus_service.h"
 
-#include "literals.h"
-
 namespace tremotesf {
     class IpcServerDbus final : public IpcServer {
         Q_OBJECT
 
     public:
-        static constexpr auto serviceName = "org.equeim.Tremotesf"_l1;
-        static constexpr auto objectPath = "/org/equeim/Tremotesf"_l1;
-        static constexpr auto interfaceName = "org.freedesktop.Application"_l1;
+        static constexpr auto serviceName = QLatin1String("org.equeim.Tremotesf");
+        static constexpr auto objectPath = QLatin1String("/org/equeim/Tremotesf");
+        static constexpr auto interfaceName = QLatin1String("org.freedesktop.Application");
 
         inline explicit IpcServerDbus(QObject* parent = nullptr) : IpcServer(parent) {};
 

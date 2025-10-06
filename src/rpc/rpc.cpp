@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -25,8 +25,9 @@
 #include "requestrouter.h"
 #include "serversettings.h"
 #include "serverstats.h"
-#include "stdutils.h"
 #include "torrent.h"
+
+using namespace Qt::StringLiterals;
 
 SPECIALIZE_FORMATTER_FOR_QDEBUG(QHostAddress)
 SPECIALIZE_FORMATTER_FOR_QDEBUG(QUrl)
@@ -38,8 +39,8 @@ namespace tremotesf {
         // Transmission 2.40+
         constexpr int minimumRpcVersion = 14;
 
-        constexpr auto torrentsKey = "torrents"_l1;
-        constexpr auto torrentDuplicateKey = "torrent-duplicate"_l1;
+        constexpr auto torrentsKey = "torrents"_L1;
+        constexpr auto torrentDuplicateKey = "torrent-duplicate"_L1;
     }
 
     using namespace impl;
@@ -133,9 +134,9 @@ namespace tremotesf {
 
         RequestRouter::RequestsConfiguration requestsConfig{};
         if (configuration.https) {
-            requestsConfig.serverUrl.setScheme("https"_l1);
+            requestsConfig.serverUrl.setScheme("https"_L1);
         } else {
-            requestsConfig.serverUrl.setScheme("http"_l1);
+            requestsConfig.serverUrl.setScheme("http"_L1);
         }
         requestsConfig.serverUrl.setHost(configuration.address);
         if (auto error = requestsConfig.serverUrl.errorString(); !error.isEmpty()) {
@@ -145,13 +146,13 @@ namespace tremotesf {
         if (auto error = requestsConfig.serverUrl.errorString(); !error.isEmpty()) {
             warning().log("Error setting URL port: {}", error);
         }
-        if (auto i = configuration.apiPath.indexOf('?'); i != -1) {
-            requestsConfig.serverUrl.setPath(configuration.apiPath.mid(0, i));
+        if (auto queryIndex = configuration.apiPath.indexOf('?'); queryIndex != -1) {
+            requestsConfig.serverUrl.setPath(configuration.apiPath.sliced(0, queryIndex));
             if (auto error = requestsConfig.serverUrl.errorString(); !error.isEmpty()) {
                 warning().log("Error setting URL path: {}", error);
             }
-            if ((i + 1) < configuration.apiPath.size()) {
-                requestsConfig.serverUrl.setQuery(configuration.apiPath.mid(i + 1));
+            if ((queryIndex + 1) < configuration.apiPath.size()) {
+                requestsConfig.serverUrl.setQuery(configuration.apiPath.sliced(queryIndex + 1));
                 if (auto error = requestsConfig.serverUrl.errorString(); !error.isEmpty()) {
                     warning().log("Error setting URL query: {}", error);
                 }
@@ -192,9 +193,22 @@ namespace tremotesf {
             break;
         }
 
-        if (configuration.https && configuration.selfSignedCertificateEnabled) {
-            requestsConfig.serverCertificateChain =
-                QSslCertificate::fromData(configuration.selfSignedCertificate, QSsl::Pem);
+        if (configuration.https) {
+            switch (configuration.serverCertificateMode) {
+            case ConnectionConfiguration::ServerCertificateMode::SelfSigned:
+                requestsConfig.serverCertificate = RequestRouter::RequestsConfiguration::SelfSignedCertificate(
+                    QSslCertificate(configuration.serverRootCertificate, QSsl::Pem)
+                );
+                break;
+            case ConnectionConfiguration::ServerCertificateMode::CustomRoot:
+                requestsConfig.serverCertificate = RequestRouter::RequestsConfiguration::CustomRoot{
+                    .rootCertificate = QSslCertificate(configuration.serverRootCertificate, QSsl::Pem),
+                    .leafCertificate = QSslCertificate(configuration.serverLeafCertificate, QSsl::Pem)
+                };
+                break;
+            case ConnectionConfiguration::ServerCertificateMode::None:
+                break;
+            }
         }
 
         if (configuration.clientCertificateEnabled) {
@@ -280,24 +294,24 @@ namespace tremotesf {
                 return std::nullopt;
             }
             QJsonObject arguments{
-                {"metainfo"_l1, fileData},
-                {"download-dir"_l1, downloadDirectory},
-                {"bandwidthPriority"_l1, TorrentData::priorityToInt(bandwidthPriority)},
-                {"paused"_l1, !start}
+                {u"metainfo"_s, fileData},
+                {u"download-dir"_s, downloadDirectory},
+                {u"bandwidthPriority"_s, TorrentData::priorityToInt(bandwidthPriority)},
+                {u"paused"_s, !start}
             };
             if (!unwantedFiles.empty()) {
-                arguments.insert("files-unwanted"_l1, toJsonArray(unwantedFiles));
+                arguments.insert("files-unwanted"_L1, toJsonArray(unwantedFiles));
             }
             if (!highPriorityFiles.empty()) {
-                arguments.insert("priority-high"_l1, toJsonArray(highPriorityFiles));
+                arguments.insert("priority-high"_L1, toJsonArray(highPriorityFiles));
             }
             if (!lowPriorityFiles.empty()) {
-                arguments.insert("priority-low"_l1, toJsonArray(lowPriorityFiles));
+                arguments.insert("priority-low"_L1, toJsonArray(lowPriorityFiles));
             }
             if (!labels.empty()) {
-                arguments.insert("labels"_l1, toJsonArray(labels));
+                arguments.insert("labels"_L1, toJsonArray(labels));
             }
-            return RequestRouter::makeRequestData("torrent-add"_l1, std::move(arguments));
+            return RequestRouter::makeRequestData("torrent-add"_L1, std::move(arguments));
         }
 
         Coroutine<> deleteTorrentFile(QString filePath, bool moveToTrash) {
@@ -348,12 +362,12 @@ namespace tremotesf {
             );
         }
         if (!isConnected()) co_return;
-        const auto response = co_await mRequestRouter->postRequest("torrent-add"_l1, std::move(requestData).value());
+        const auto response = co_await mRequestRouter->postRequest("torrent-add"_L1, std::move(requestData).value());
         if (response.arguments.contains(torrentDuplicateKey)) {
             emit torrentAddDuplicate();
         } else if (response.success) {
             if (!renamedFiles.empty()) {
-                const auto torrentJson = response.arguments.value("torrent-added"_l1).toObject();
+                const auto torrentJson = response.arguments.value("torrent-added"_L1).toObject();
                 const auto id = Torrent::idFromJson(torrentJson);
                 if (id.has_value()) {
                     for (const auto& [filePathToRename, newName] : renamedFiles) {
@@ -393,11 +407,13 @@ namespace tremotesf {
         std::vector<QString> labels
     ) {
         const int priorityInt = TorrentData::priorityToInt(bandwidthPriority);
-        co_await waitAll(toContainer<std::vector>(
-            links | std::views::transform([&](QString& link) {
-                return addTorrentLinkImpl(std::move(link), downloadDirectory, priorityInt, start, labels);
-            })
-        ));
+        co_await waitAll(
+            links
+            | std::views::transform([&](QString& link) {
+                  return addTorrentLinkImpl(std::move(link), downloadDirectory, priorityInt, start, labels);
+              })
+            | std::ranges::to<std::vector>()
+        );
         mBackgroundRequestsCoroutineScope.launch(updateData());
     }
 
@@ -405,15 +421,15 @@ namespace tremotesf {
         QString link, QString downloadDirectory, int bandwidthPriority, bool start, std::vector<QString> labels
     ) {
         QJsonObject arguments{
-            {"filename"_l1, link},
-            {"download-dir"_l1, downloadDirectory},
-            {"bandwidthPriority"_l1, bandwidthPriority},
-            {"paused"_l1, !start}
+            {u"filename"_s, link},
+            {u"download-dir"_s, downloadDirectory},
+            {u"bandwidthPriority"_s, bandwidthPriority},
+            {u"paused"_s, !start}
         };
         if (!labels.empty()) {
-            arguments.insert("labels"_l1, toJsonArray(labels));
+            arguments.insert("labels"_L1, toJsonArray(labels));
         }
-        const auto response = co_await mRequestRouter->postRequest("torrent-add"_l1, std::move(arguments));
+        const auto response = co_await mRequestRouter->postRequest("torrent-add"_L1, std::move(arguments));
         if (response.arguments.contains(torrentDuplicateKey)) {
             emit torrentAddDuplicate();
         } else if (!response.success) {
@@ -422,45 +438,45 @@ namespace tremotesf {
     }
 
     void Rpc::startTorrents(std::span<const int> ids) {
-        mBackgroundRequestsCoroutineScope.launch(postRequest("torrent-start"_l1, {{"ids"_l1, toJsonArray(ids)}}));
+        mBackgroundRequestsCoroutineScope.launch(postRequest("torrent-start"_L1, {{u"ids"_s, toJsonArray(ids)}}));
     }
 
     void Rpc::startTorrentsNow(std::span<const int> ids) {
-        mBackgroundRequestsCoroutineScope.launch(postRequest("torrent-start-now"_l1, {{"ids"_l1, toJsonArray(ids)}}));
+        mBackgroundRequestsCoroutineScope.launch(postRequest("torrent-start-now"_L1, {{u"ids"_s, toJsonArray(ids)}}));
     }
 
     void Rpc::pauseTorrents(std::span<const int> ids) {
-        mBackgroundRequestsCoroutineScope.launch(postRequest("torrent-stop"_l1, {{"ids"_l1, toJsonArray(ids)}}));
+        mBackgroundRequestsCoroutineScope.launch(postRequest("torrent-stop"_L1, {{u"ids"_s, toJsonArray(ids)}}));
     }
 
     void Rpc::removeTorrents(std::span<const int> ids, bool deleteFiles) {
         mBackgroundRequestsCoroutineScope.launch(
-            postRequest("torrent-remove"_l1, {{"ids"_l1, toJsonArray(ids)}, {"delete-local-data"_l1, deleteFiles}})
+            postRequest("torrent-remove"_L1, {{u"ids"_s, toJsonArray(ids)}, {u"delete-local-data"_s, deleteFiles}})
         );
     }
 
     void Rpc::checkTorrents(std::span<const int> ids) {
-        mBackgroundRequestsCoroutineScope.launch(postRequest("torrent-verify"_l1, {{"ids"_l1, toJsonArray(ids)}}));
+        mBackgroundRequestsCoroutineScope.launch(postRequest("torrent-verify"_L1, {{u"ids"_s, toJsonArray(ids)}}));
     }
 
     void Rpc::moveTorrentsToTop(std::span<const int> ids) {
-        mBackgroundRequestsCoroutineScope.launch(postRequest("queue-move-top"_l1, {{"ids"_l1, toJsonArray(ids)}}));
+        mBackgroundRequestsCoroutineScope.launch(postRequest("queue-move-top"_L1, {{u"ids"_s, toJsonArray(ids)}}));
     }
 
     void Rpc::moveTorrentsUp(std::span<const int> ids) {
-        mBackgroundRequestsCoroutineScope.launch(postRequest("queue-move-up"_l1, {{"ids"_l1, toJsonArray(ids)}}));
+        mBackgroundRequestsCoroutineScope.launch(postRequest("queue-move-up"_L1, {{u"ids"_s, toJsonArray(ids)}}));
     }
 
     void Rpc::moveTorrentsDown(std::span<const int> ids) {
-        mBackgroundRequestsCoroutineScope.launch(postRequest("queue-move-down"_l1, {{"ids"_l1, toJsonArray(ids)}}));
+        mBackgroundRequestsCoroutineScope.launch(postRequest("queue-move-down"_L1, {{u"ids"_s, toJsonArray(ids)}}));
     }
 
     void Rpc::moveTorrentsToBottom(std::span<const int> ids) {
-        mBackgroundRequestsCoroutineScope.launch(postRequest("queue-move-bottom"_l1, {{"ids"_l1, toJsonArray(ids)}}));
+        mBackgroundRequestsCoroutineScope.launch(postRequest("queue-move-bottom"_L1, {{u"ids"_s, toJsonArray(ids)}}));
     }
 
     void Rpc::reannounceTorrents(std::span<const int> ids) {
-        mBackgroundRequestsCoroutineScope.launch(postRequest("torrent-reannounce"_l1, {{"ids"_l1, toJsonArray(ids)}}));
+        mBackgroundRequestsCoroutineScope.launch(postRequest("torrent-reannounce"_L1, {{u"ids"_s, toJsonArray(ids)}}));
     }
 
     void Rpc::setSessionProperty(QString property, QJsonValue value) {
@@ -468,27 +484,27 @@ namespace tremotesf {
     }
 
     void Rpc::setSessionProperties(QJsonObject properties) {
-        mBackgroundRequestsCoroutineScope.launch(postRequest("session-set"_l1, std::move(properties), false));
+        mBackgroundRequestsCoroutineScope.launch(postRequest("session-set"_L1, std::move(properties), false));
     }
 
     void Rpc::setTorrentProperty(int id, QString property, QJsonValue value, bool updateIfSuccessful) {
         mBackgroundRequestsCoroutineScope.launch(postRequest(
-            "torrent-set"_l1,
-            {{"ids"_l1, QJsonArray{id}}, {property, std::move(value)}},
+            "torrent-set"_L1,
+            {{u"ids"_s, QJsonArray{id}}, {std::move(property), std::move(value)}},
             updateIfSuccessful
         ));
     }
 
     void Rpc::setTorrentsLocation(std::span<const int> ids, QString location, bool moveFiles) {
         mBackgroundRequestsCoroutineScope.launch(postRequest(
-            "torrent-set-location"_l1,
-            {{"ids"_l1, toJsonArray(ids)}, {"location"_l1, location}, {"move"_l1, moveFiles}}
+            "torrent-set-location"_L1,
+            {{u"ids"_s, toJsonArray(ids)}, {u"location"_s, location}, {u"move"_s, moveFiles}}
         ));
     }
 
     void Rpc::setTorrentsLabels(std::span<const int> ids, std::span<const QString> labels) {
         mBackgroundRequestsCoroutineScope.launch(
-            postRequest("torrent-set"_l1, {{"ids"_l1, toJsonArray(ids)}, {"labels"_l1, toJsonArray(labels)}})
+            postRequest("torrent-set"_L1, {{u"ids"_s, toJsonArray(ids)}, {u"labels"_s, toJsonArray(labels)}})
         );
     }
 
@@ -500,10 +516,10 @@ namespace tremotesf {
 
     Coroutine<> Rpc::getTorrentsFiles(QJsonArray ids) {
         QJsonObject arguments{
-            {"fields"_l1, QJsonArray{"id"_l1, "files"_l1, "fileStats"_l1}},
-            {"ids"_l1, std::move(ids)}
+            {u"fields"_s, QJsonArray{"id"_L1, "files"_L1, "fileStats"_L1}},
+            {u"ids"_s, std::move(ids)}
         };
-        const auto response = co_await mRequestRouter->postRequest("torrent-get"_l1, std::move(arguments));
+        const auto response = co_await mRequestRouter->postRequest("torrent-get"_L1, std::move(arguments));
         if (!response.success) co_return;
         const QJsonArray torrents = response.arguments.value(torrentsKey).toArray();
         for (const auto& torrentJson : torrents) {
@@ -525,8 +541,8 @@ namespace tremotesf {
     }
 
     Coroutine<> Rpc::getTorrentsPeers(QJsonArray ids) {
-        QJsonObject arguments{{"fields"_l1, QJsonArray{"id"_l1, "peers"_l1}}, {"ids"_l1, std::move(ids)}};
-        const auto response = co_await mRequestRouter->postRequest("torrent-get"_l1, std::move(arguments));
+        QJsonObject arguments{{u"fields"_s, QJsonArray{u"id"_s, u"peers"_s}}, {u"ids"_s, std::move(ids)}};
+        const auto response = co_await mRequestRouter->postRequest("torrent-get"_L1, std::move(arguments));
         if (!response.success) co_return;
         const QJsonArray torrents = response.arguments.value(torrentsKey).toArray();
         for (const auto& torrentJson : torrents) {
@@ -550,13 +566,13 @@ namespace tremotesf {
     }
 
     Coroutine<> Rpc::renameTorrentFileImpl(int torrentId, QString filePath, QString newName) {
-        QJsonObject arguments = {{"ids"_l1, QJsonArray{torrentId}}, {"path"_l1, filePath}, {"name"_l1, newName}};
-        const auto response = co_await mRequestRouter->postRequest("torrent-rename-path"_l1, std::move(arguments));
+        QJsonObject arguments = {{u"ids"_s, QJsonArray{torrentId}}, {u"path"_s, filePath}, {u"name"_s, newName}};
+        const auto response = co_await mRequestRouter->postRequest("torrent-rename-path"_L1, std::move(arguments));
         if (response.success) {
             Torrent* torrent = torrentById(torrentId);
             if (torrent) {
-                const QString filePathFromReponse = response.arguments.value("path"_l1).toString();
-                const QString newNameFromReponse = response.arguments.value("name"_l1).toString();
+                const QString filePathFromReponse = response.arguments.value("path"_L1).toString();
+                const QString newNameFromReponse = response.arguments.value("name"_L1).toString();
                 emit torrent->fileRenamed(filePathFromReponse, newNameFromReponse);
                 mBackgroundRequestsCoroutineScope.launch(updateData());
             }
@@ -575,18 +591,20 @@ namespace tremotesf {
 
     Coroutine<std::optional<qint64>> Rpc::getDownloadDirFreeSpaceImpl() {
         const auto response = co_await mRequestRouter->postRequest(
-            "download-dir-free-space"_l1,
-            QByteArrayLiteral("{"
-                              "\"arguments\":{"
-                              "\"fields\":["
-                              "\"download-dir-free-space\""
-                              "]"
-                              "},"
-                              "\"method\":\"session-get\""
-                              "}")
+            "download-dir-free-space"_L1,
+
+            "{"
+            "\"arguments\":{"
+            "\"fields\":["
+            "\"download-dir-free-space\""
+            "]"
+            "},"
+            "\"method\":\"session-get\""
+            "}"_ba
+
         );
         if (response.success) {
-            co_return toInt64(response.arguments.value("download-dir-free-space"_l1));
+            co_return response.arguments.value("download-dir-free-space"_L1).toInteger();
         }
         co_return std::nullopt;
     }
@@ -604,10 +622,10 @@ namespace tremotesf {
     }
 
     Coroutine<std::optional<qint64>> Rpc::getFreeSpaceForPathImpl(QString path) {
-        QJsonObject arguments{{"path"_l1, path}};
-        const auto response = co_await mRequestRouter->postRequest("free-space"_l1, std::move(arguments));
+        QJsonObject arguments{{u"path"_s, path}};
+        const auto response = co_await mRequestRouter->postRequest("free-space"_L1, std::move(arguments));
         if (response.success) {
-            co_return toInt64(response.arguments.value("size-bytes"_l1));
+            co_return response.arguments.value("size-bytes"_L1).toInteger();
         }
         co_return std::nullopt;
     }
@@ -619,7 +637,7 @@ namespace tremotesf {
     }
 
     Coroutine<> Rpc::shutdownServerImpl() {
-        const auto response = co_await mRequestRouter->postRequest("session-close"_l1, QJsonObject{});
+        const auto response = co_await mRequestRouter->postRequest("session-close"_L1, QJsonObject{});
         if (response.success) {
             info().log("Successfully sent shutdown request, disconnecting");
             disconnect();
@@ -717,19 +735,18 @@ namespace tremotesf {
     }
 
     Coroutine<> Rpc::getServerSettings() {
-        const auto response =
-            co_await mRequestRouter->postRequest("session-get"_l1, QByteArrayLiteral("{\"method\":\"session-get\"}"));
+        const auto response = co_await mRequestRouter->postRequest("session-get"_L1, R"({"method":"session-get"})"_ba);
         if (response.success) {
             mServerSettings->update(response.arguments);
             if (mServerSettings->data().hasTableMode()) {
                 mGetTorrentsRequestData = RequestRouter::makeRequestData(
-                    "torrent-get"_l1,
-                    QJsonObject{{"fields"_l1, Torrent::updateFields(mServerSettings)}, {"format"_l1, "table"_l1}}
+                    "torrent-get"_L1,
+                    QJsonObject{{u"fields"_s, Torrent::updateFields(mServerSettings)}, {u"format"_s, "table"_L1}}
                 );
             } else {
                 mGetTorrentsRequestData = RequestRouter::makeRequestData(
-                    "torrent-get"_l1,
-                    QJsonObject{{"fields"_l1, Torrent::updateFields(mServerSettings)}}
+                    "torrent-get"_L1,
+                    QJsonObject{{u"fields"_s, Torrent::updateFields(mServerSettings)}}
                 );
             }
         }
@@ -748,7 +765,6 @@ namespace tremotesf {
         std::vector<std::pair<int, int>> removedIndexRanges{};
         std::vector<std::pair<int, int>> changedIndexRanges{};
         int addedCount{};
-        std::vector<int> metadataCompletedIds{};
 
     protected:
         std::vector<NewTorrent>::iterator
@@ -770,7 +786,6 @@ namespace tremotesf {
             const bool wasFinished = torrent->data().isFinished();
             const bool wasPaused = (torrent->data().status == TorrentData::Status::Paused);
             const auto oldSizeWhenDone = torrent->data().sizeWhenDone;
-            const bool metadataWasComplete = torrent->data().metadataComplete;
 
             bool changed{};
             if (keys) {
@@ -782,12 +797,11 @@ namespace tremotesf {
                 // Don't emit torrentFinished() if torrent's size became smaller
                 // since there is high chance that it happened because user unselected some files
                 // and torrent immediately became finished. We don't want notification in that case
-                if (!wasFinished && torrent->data().isFinished() && !wasPaused &&
-                    torrent->data().sizeWhenDone >= oldSizeWhenDone) {
+                if (!wasFinished
+                    && torrent->data().isFinished()
+                    && !wasPaused
+                    && torrent->data().sizeWhenDone >= oldSizeWhenDone) {
                     emit mRpc.torrentFinished(torrent.get());
-                }
-                if (!metadataWasComplete && torrent->data().metadataComplete) {
-                    metadataCompletedIds.push_back(newTorrent.id);
                 }
             }
 
@@ -810,9 +824,6 @@ namespace tremotesf {
             if (mRpc.isConnected()) {
                 emit mRpc.torrentAdded(torrent.get());
             }
-            if (torrent->data().metadataComplete) {
-                metadataCompletedIds.push_back(newTorrent.id);
-            }
             return torrent;
         }
 
@@ -828,12 +839,12 @@ namespace tremotesf {
     };
 
     Coroutine<> Rpc::getTorrents() {
-        const auto response = co_await mRequestRouter->postRequest("torrent-get"_l1, mGetTorrentsRequestData);
+        const auto response = co_await mRequestRouter->postRequest("torrent-get"_L1, mGetTorrentsRequestData);
         if (!response.success) co_return;
 
         TorrentsListUpdater updater(*this);
         {
-            const QJsonArray torrentsJsons = response.arguments.value("torrents"_l1).toArray();
+            const QJsonArray torrentsJsons = response.arguments.value("torrents"_L1).toArray();
             std::vector<NewTorrent> newTorrents{};
             if (mServerSettings->data().hasTableMode()) {
                 if (!torrentsJsons.empty()) {
@@ -844,7 +855,7 @@ namespace tremotesf {
                         for (const auto& json : torrentsJsons | std::views::drop(1)) {
                             const auto array = json.toArray();
                             if (static_cast<size_t>(array.size()) == keys.size()) {
-                                newTorrents.push_back(NewTorrent{array[*idKeyIndex].toInt(), json});
+                                newTorrents.push_back(NewTorrent{.id = array[*idKeyIndex].toInt(), .json = json});
                             }
                         }
                         updater.keys = &keys;
@@ -856,7 +867,7 @@ namespace tremotesf {
                 for (const auto& torrentJson : torrentsJsons) {
                     const auto id = Torrent::idFromJson(torrentJson.toObject());
                     if (id.has_value()) {
-                        newTorrents.push_back(NewTorrent{*id, torrentJson});
+                        newTorrents.push_back(NewTorrent{.id = *id, .json = torrentJson});
                     }
                 }
                 updater.update(mTorrents, std::move(newTorrents));
@@ -864,9 +875,6 @@ namespace tremotesf {
         }
 
         std::vector<Coroutine<>> additionalRequests{};
-        if (!mServerSettings->data().hasFileCountProperty() && !updater.metadataCompletedIds.empty()) {
-            additionalRequests.push_back(checkTorrentsSingleFile(std::move(updater.metadataCompletedIds)));
-        }
         QJsonArray getFilesIds{};
         QJsonArray getPeersIds{};
         for (const auto& torrent : mTorrents) {
@@ -893,28 +901,9 @@ namespace tremotesf {
         }
     }
 
-    Coroutine<> Rpc::checkTorrentsSingleFile(std::vector<int> torrentIds) {
-        QJsonObject arguments{{"fields"_l1, QJsonArray{"id"_l1, "priorities"_l1}}, {"ids"_l1, toJsonArray(torrentIds)}};
-        const auto response = co_await mRequestRouter->postRequest("torrent-get"_l1, std::move(arguments));
-        if (!response.success) co_return;
-        const auto torrentJsons = response.arguments.value(torrentsKey).toArray();
-        for (const auto& torrentJson : torrentJsons) {
-            const auto object = torrentJson.toObject();
-            const auto torrentId = Torrent::idFromJson(object);
-            if (torrentId.has_value()) {
-                Torrent* torrent = torrentById(*torrentId);
-                if (torrent) {
-                    torrent->checkSingleFile(object);
-                }
-            }
-        }
-    }
-
     Coroutine<> Rpc::getServerStats() {
-        const auto response = co_await mRequestRouter->postRequest(
-            "session-stats"_l1,
-            QByteArrayLiteral("{\"method\":\"session-stats\"}")
-        );
+        const auto response =
+            co_await mRequestRouter->postRequest("session-stats"_L1, R"({"method":"session-stats"})"_ba);
         if (response.success) {
             mServerStats->update(response.arguments);
         }
@@ -946,8 +935,9 @@ namespace tremotesf {
 
     Coroutine<> Rpc::checkIfServerIsLocal() {
         info().log("checkIfServerIsLocal() called");
-        if (mServerSettings->data().hasSessionIdFile() && !mRequestRouter->sessionId().isEmpty() &&
-            isTransmissionSessionIdFileExists(mRequestRouter->sessionId())) {
+        if (mServerSettings->data().hasSessionIdFile()
+            && !mRequestRouter->sessionId().isEmpty()
+            && isTransmissionSessionIdFileExists(mRequestRouter->sessionId())) {
             mServerIsLocal = true;
             info().log("checkIfServerIsLocal: server is running locally: true");
             co_return;
@@ -980,7 +970,12 @@ namespace tremotesf {
     }
 
     void Rpc::onRequestFailed(RpcError error, const QString& errorMessage, const QString& detailedErrorMessage) {
-        setStatus({RpcConnectionState::Disconnected, error, errorMessage, detailedErrorMessage});
+        setStatus(
+            {.connectionState = RpcConnectionState::Disconnected,
+             .error = error,
+             .errorMessage = errorMessage,
+             .detailedErrorMessage = detailedErrorMessage}
+        );
     }
 
     Coroutine<> Rpc::autoReconnect() {

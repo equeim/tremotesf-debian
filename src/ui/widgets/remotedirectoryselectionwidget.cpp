@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -12,12 +12,13 @@
 #include <QPushButton>
 #include <QMessageBox>
 
-#include "literals.h"
 #include "target_os.h"
 #include "rpc/rpc.h"
 #include "rpc/servers.h"
 #include "rpc/serversettings.h"
 #include "ui/stylehelpers.h"
+
+using namespace Qt::StringLiterals;
 
 namespace tremotesf {
     RemoteDirectorySelectionWidgetViewModel::RemoteDirectorySelectionWidgetViewModel(
@@ -88,7 +89,7 @@ namespace tremotesf {
         mTextField = createTextField();
         layout->addWidget(mTextField, 1);
 
-        mSelectDirectoryButton = new QPushButton(QIcon::fromTheme("document-open"_l1), QString(), this);
+        mSelectDirectoryButton = new QPushButton(QIcon::fromTheme("document-open"_L1), QString(), this);
         layout->addWidget(mSelectDirectoryButton);
         mSelectDirectoryButton->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
         if constexpr (targetOs == TargetOs::UnixMacOS) {
@@ -112,7 +113,7 @@ namespace tremotesf {
         }
 
         const auto lineEdit = lineEditFromTextField();
-        const auto updateLineEdit = [=, this]() { lineEdit->setText(mViewModel->displayPath()); };
+        const auto updateLineEdit = [=, this] { lineEdit->setText(mViewModel->displayPath()); };
         updateLineEdit();
         QObject::connect(mViewModel, &RemoteDirectorySelectionWidgetViewModel::pathChanged, this, updateLineEdit);
         QObject::connect(
@@ -127,7 +128,7 @@ namespace tremotesf {
         });
 
         QObject::connect(
-            static_cast<RemoteDirectorySelectionWidgetViewModel*>(mViewModel),
+            mViewModel,
             &RemoteDirectorySelectionWidgetViewModel::showMountedDirectoryError,
             this,
             [=, this] {

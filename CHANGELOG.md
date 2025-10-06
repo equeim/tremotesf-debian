@@ -1,5 +1,34 @@
 # Changelog
 
+## [2.9.0] - 2025-10-03
+### Added
+- The first column in torrents, trackers, and peers lists can now be reordered too (thanks @keizie)
+- Torrents can be renamed using F2 shortcut (thanks @keizie)
+- Torrent's file list show appropriate file icons based on file extensions
+
+### Fixed
+- Fixed opening torrent's directory when torrent has a single file in a directory (thanks @keizie)
+- Fixed window activation when opening torrent's file or its download directory on Linux/Wayland
+- Relocating the torrent does not save the directory for use in "Add torrent" dialog (thanks @keizie)
+- Improved support of servers that use HTTPS certificate chain with custom root CA
+
+### Changed
+- Minimum dependencies baseline has been raised:
+  - GCC 14 or Clang 19 (MSVC and Apple Clang are always required to be the latest available versions)
+  - Qt 6.8 (Qt 5 support is removed)
+  - KDE Frameworks 6.11
+  - fmt 10.1.0
+  - cxxopts 3.2.1
+  - cpp-httplib 0.18.7
+  - gettext 0.22.5
+- Clarified dependency on cpp-httplib with OpenSSL support enabled, not OpenSSL itself
+- If your server uses HTTPS certificate chain with custom root CA (instead of single self-signed certificate),
+  then you need to specify the root certificate in the connection settings, and optionally the leaf certificate if it doesn't have correct host name
+
+### Removed
+- Qt 5 support
+- Native packages for Debian older than 13 and Ubuntu older than 25.04 (and other distros with outdated packages). Users of these distros can still install Tremotesf through Flatpak
+
 ## [2.8.2] - 2025-04-16
 ### Fixed
 - Crash when failing to parse server response as JSON

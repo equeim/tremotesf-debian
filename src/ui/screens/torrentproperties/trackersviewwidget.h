@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -7,13 +7,14 @@
 
 #include <QWidget>
 
+class QTreeView;
+
 namespace tremotesf {
     class Torrent;
 }
 
 namespace tremotesf {
     class BaseProxyModel;
-    class BaseTreeView;
     class Rpc;
     class TrackersModel;
 
@@ -22,6 +23,7 @@ namespace tremotesf {
 
     public:
         TrackersViewWidget(Rpc* rpc, QWidget* parent = nullptr);
+        ~TrackersViewWidget() override = default;
         Q_DISABLE_COPY_MOVE(TrackersViewWidget)
 
         void setTorrent(Torrent* torrent, bool oldTorrentDestroyed);
@@ -36,7 +38,7 @@ namespace tremotesf {
         Rpc* mRpc{};
         TrackersModel* mModel{};
         BaseProxyModel* mProxyModel{};
-        BaseTreeView* mTrackersView{};
+        QTreeView* mTrackersView{};
     };
 }
 

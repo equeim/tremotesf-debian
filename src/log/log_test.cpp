@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -22,6 +22,7 @@
 
 SPECIALIZE_FORMATTER_FOR_QDEBUG(QVariant)
 
+using namespace Qt::StringLiterals;
 using namespace tremotesf;
 
 #ifdef Q_OS_WIN
@@ -73,14 +74,13 @@ private slots:
     }
 
     void stdoutQLatin1String() {
-        const auto str = "foo"_l1;
+        const auto str = "foo"_L1;
         printlnStdout(str);
         printlnStdout("{}", str);
         printlnStdout(FMT_STRING("{}"), str);
         printlnStdout(fmt::runtime("{}"), str);
     }
 
-#if QT_VERSION_MAJOR >= 6
     void stdoutQUtf8StringView() {
         const QUtf8StringView str = "foo";
         printlnStdout(str);
@@ -96,7 +96,6 @@ private slots:
         printlnStdout(FMT_STRING("{}"), str);
         printlnStdout(fmt::runtime("{}"), str);
     }
-#endif
 
     void stdoutQVariant() {
         const QVariant value = "foo";
@@ -178,14 +177,13 @@ private slots:
     }
 
     void infoQLatin1String() {
-        const auto str = "foo"_l1;
+        const auto str = "foo"_L1;
         info().log(str);
         info().log("{}", str);
         info().log(FMT_STRING("{}"), str);
         info().log(fmt::runtime("{}"), str);
     }
 
-#if QT_VERSION_MAJOR >= 6
     void infoQUtf8StringView() {
         const QUtf8StringView str = "foo";
         info().log(str);
@@ -201,7 +199,6 @@ private slots:
         info().log(FMT_STRING("{}"), str);
         info().log(fmt::runtime("{}"), str);
     }
-#endif
 
     void infoQVariant() {
         const QVariant value = "foo";

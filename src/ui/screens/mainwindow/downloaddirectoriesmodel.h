@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -14,7 +14,7 @@ namespace tremotesf {
         Q_OBJECT
 
     public:
-        enum class Role { Directory = Qt::UserRole, AlwaysShowTooltip };
+        enum class Role { Directory = Qt::UserRole };
 
         explicit DownloadDirectoriesModel(QObject* parent = nullptr);
 

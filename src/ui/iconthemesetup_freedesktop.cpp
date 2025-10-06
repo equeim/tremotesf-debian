@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -7,8 +7,9 @@
 #include <QPalette>
 
 #include "iconthemesetup.h"
-#include "literals.h"
 #include "log/log.h"
+
+using namespace Qt::StringLiterals;
 
 namespace tremotesf {
     namespace {
@@ -19,7 +20,7 @@ namespace tremotesf {
             return windowBackgroundGray < 192;
         }
 
-        QLatin1String fallbackTheme() { return isPaletteDark() ? "breeze-dark"_l1 : "breeze"_l1; }
+        QLatin1String fallbackTheme() { return isPaletteDark() ? "breeze-dark"_L1 : "breeze"_L1; }
     }
 
     void setupIconTheme() {

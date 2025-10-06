@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -96,6 +96,7 @@ namespace tremotesf {
                     try {
                         checkHResult(
                             DwmSetWindowAttribute(
+                                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast,performance-no-int-to-ptr)
                                 reinterpret_cast<HWND>(window->winId()),
                                 DWMWINDOWATTRIBUTE_compat::DWMWA_CAPTION_COLOR,
                                 &color,
@@ -129,6 +130,7 @@ namespace tremotesf {
                     try {
                         checkHResult(
                             DwmSetWindowAttribute(
+                                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast,performance-no-int-to-ptr)
                                 reinterpret_cast<HWND>(window->winId()),
                                 attribute,
                                 &useImmersiveDarkMode,

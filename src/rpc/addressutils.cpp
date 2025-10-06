@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -23,7 +23,7 @@ namespace tremotesf {
         for (const auto& address : addresses) {
             info().log("isLocalIpAddress: - {}", address);
         }
-        if (QNetworkInterface::allAddresses().contains(ipAddress)) {
+        if (addresses.contains(ipAddress)) {
             info().log("isLocalIpAddress: address is this machine's IP address, return true");
             return true;
         }

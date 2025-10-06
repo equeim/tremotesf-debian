@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -24,12 +24,12 @@
 #include <windows.h>
 
 #include "fileutils.h"
-#include "literals.h"
 #include "log/log.h"
 #include "windowshelpers.h"
 #include "windowsfatalerrorhandlers.h"
 
 namespace fs = std::filesystem;
+using namespace Qt::StringLiterals;
 
 namespace tremotesf {
     namespace {
@@ -152,7 +152,7 @@ namespace tremotesf {
                     writeBytes(file, message.toUtf8());
                     static constexpr std::array<char, 1> lineTerminator{'\n'};
                     writeBytes(file, lineTerminator);
-                } catch ([[maybe_unused]] const QFileError& e) {}
+                } catch ([[maybe_unused]] const QFileError& e) {} // NOLINT(bugprone-empty-catch)
             }
 
             MessageQueue mQueue{};
@@ -172,6 +172,7 @@ namespace tremotesf {
             }
         }
 
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
         std::unique_ptr<FileLogger> globalFileLogger{};
 
         [[maybe_unused]] void releaseMessageHandler(QString message) {
@@ -223,7 +224,7 @@ namespace tremotesf {
     void initWindowsMessageHandler() {
         qInstallMessageHandler(windowsMessageHandler);
         qSetMessagePattern(
-            "[%{time yyyy.MM.dd h:mm:ss.zzz t} %{if-debug}D%{endif}%{if-info}I%{endif}%{if-warning}W%{endif}%{if-critical}C%{endif}%{if-fatal}F%{endif}] %{message}"_l1
+            "[%{time yyyy.MM.dd h:mm:ss.zzz t} %{if-debug}D%{endif}%{if-info}I%{endif}%{if-warning}W%{endif}%{if-critical}C%{endif}%{if-fatal}F%{endif}] %{message}"_L1
         );
 #ifndef QT_DEBUG
         globalFileLogger = std::make_unique<FileLogger>();

@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+# SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 #
 # SPDX-License-Identifier: CC0-1.0
 
@@ -14,7 +14,7 @@ macro(find_system_httplib)
     else ()
         message(STATUS "Did not find cpp-httplib as a CMake package")
         message(STATUS "Trying cpp-httplib using pkg-config")
-        pkg_check_modules(httplib IMPORTED_TARGET "cpp-httplib >= 0.11")
+        pkg_check_modules(httplib IMPORTED_TARGET "cpp-httplib >= 0.18.7")
         unset(module)
         if (httplib_FOUND)
             message(STATUS "Found cpp-httplib ${httplib_VERSION} using pkg-config")

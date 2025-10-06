@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -84,22 +84,14 @@ namespace tremotesf::impl {
 
     template<std::ranges::input_range FromRange>
         requires std::convertible_to<std::ranges::range_value_t<FromRange>, QJsonValue>
-    inline QJsonArray toJsonArray(FromRange&& from) {
+    inline QJsonArray toJsonArray(const FromRange& from) {
         QJsonArray array{};
         std::ranges::copy(from, std::back_insert_iterator(array));
         return array;
     }
 
-    inline qint64 toInt64(const QJsonValue& value) {
-#if QT_VERSION_MAJOR > 5
-        return value.toInteger();
-#else
-        return static_cast<qint64>(value.toDouble());
-#endif
-    }
-
     inline void updateDateTime(QDateTime& dateTime, const QJsonValue& value, bool& changed) {
-        const auto newDateTime = toInt64(value);
+        const auto newDateTime = value.toInteger();
         if (newDateTime > 0) {
             if (!dateTime.isValid() || newDateTime != dateTime.toSecsSinceEpoch()) {
                 dateTime.setSecsSinceEpoch(newDateTime);

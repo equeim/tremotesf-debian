@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -16,7 +16,8 @@
 #include <KTitleWidget>
 
 #include "fileutils.h"
-#include "literals.h"
+
+using namespace Qt::StringLiterals;
 
 namespace tremotesf {
     AboutDialog::AboutDialog(QWidget* parent) : QDialog(parent) {
@@ -27,23 +28,26 @@ namespace tremotesf {
 
         auto titleWidget = new KTitleWidget(this);
         titleWidget->setIcon(qApp->windowIcon(), KTitleWidget::ImageLeft);
-        titleWidget->setText(QString::fromLatin1("%1 %2").arg(TREMOTESF_APP_NAME ""_l1, qApp->applicationVersion()));
+        titleWidget->setText(QString("%1 %2"_L1).arg(TREMOTESF_APP_NAME ""_L1, qApp->applicationVersion()));
         layout->addWidget(titleWidget);
 
         auto tabWidget = new QTabWidget(this);
 
         auto aboutPage = new QWidget(this);
         auto aboutPageLayout = new QVBoxLayout(aboutPage);
+
+        const auto aboutPageTemplate = uR"(
+<p>&#169; 2015-2025 Alexey Rochev &lt;<a href="mailto:equeim@gmail.com">equeim@gmail.com</a>&gt;</p>
+<p>%1
+<a href="https://github.com/equeim/tremotesf2">https://github.com/equeim/tremotesf2</a></p>
+<p>%2
+<a href="https://www.transifex.com/equeim/tremotesf">https://www.transifex.com/equeim/tremotesf</a></p>
+)"_s;
+
         auto aboutPageLabel = new QLabel(
-            //: "About" dialog text
-            qApp->translate(
-                "tremotesf",
-                "<p>&#169; 2015-2024 Alexey Rochev &lt;<a "
-                "href=\"mailto:equeim@gmail.com\">equeim@gmail.com</a>&gt;</p>\n"
-                "<p>Source code: <a "
-                "href=\"https://github.com/equeim/tremotesf2\">https://github.com/equeim/tremotesf2</a></p>\n"
-                "<p>Translations: <a "
-                "href=\"https://www.transifex.com/equeim/tremotesf\">https://www.transifex.com/equeim/tremotesf</a></p>"
+            aboutPageTemplate.arg(
+                qApp->translate("tremotesf", "Source code:").toHtmlEscaped(),
+                qApp->translate("tremotesf", "Translations:").toHtmlEscaped()
             ),
             this
         );

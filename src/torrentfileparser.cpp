@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -10,7 +10,6 @@
 #include "torrentfileparser.h"
 
 #include "fileutils.h"
-#include "stdutils.h"
 
 using namespace std::string_view_literals;
 
@@ -80,12 +79,12 @@ namespace tremotesf {
         : infoHashV1(std::move(infoHashV1)) {
         auto rootDict = std::move(value).takeDictionary();
         if (auto announceList = maybeTakeDictValue<bencode::List>(rootDict, announceListKey); announceList) {
-            trackers = toContainer<std::vector>(*announceList | std::views::transform([](bencode::Value& value) {
-                return toContainer<std::set>(
-                    std::move(value).takeList() |
-                    std::views::transform([](bencode::Value& value) { return std::move(value).takeString(); })
-                );
-            }));
+            trackers = *announceList | std::views::transform([](bencode::Value& value) {
+                return std::move(value).takeList()
+                       | std::views::as_rvalue
+                       | std::views::transform(&bencode::Value::takeString)
+                       | std::ranges::to<std::set>();
+            }) | std::ranges::to<std::vector>();
         } else if (auto announce = maybeTakeDictValue<QString>(rootDict, announceKey); announce) {
             trackers = std::vector{std::set{std::move(*announce)}};
         }
@@ -114,7 +113,7 @@ namespace tremotesf {
 
     QDebug operator<<(QDebug debug, const TorrentMetainfoFile& torrentFile) {
         const QDebugStateSaver saver(debug);
-        debug.noquote() << fmt::format(impl::singleArgumentFormatString, torrentFile).c_str();
+        debug.noquote() << fmt::format(singleArgumentFormatString, torrentFile).c_str();
         return debug;
     }
 }

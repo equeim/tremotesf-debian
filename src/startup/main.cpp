@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -14,9 +14,7 @@
 #include <fmt/ranges.h>
 
 #include "commandlineparser.h"
-#include "literals.h"
 #include "signalhandler.h"
-#include "target_os.h"
 #include "ipc/ipcclient.h"
 #include "log/log.h"
 #include "ui/iconthemesetup.h"
@@ -41,6 +39,7 @@ using namespace std::chrono_literals;
 
 SPECIALIZE_FORMATTER_FOR_QDEBUG(QLocale)
 
+using namespace Qt::StringLiterals;
 using namespace tremotesf;
 
 namespace {
@@ -99,39 +98,20 @@ namespace {
         if (!tremotesfLoggingCategory().isDebugEnabled()) {
             return;
         }
-        QLocale locale{};
+        const QLocale locale{};
         debug().log("Current locale is: {}", locale.name());
         debug().log("Language: {}", locale.language());
         debug().log("Script: {}", locale.script());
-#if QT_VERSION_MAJOR >= 6
         debug().log("Territory: {}", locale.territory());
-#endif
         debug().log("UI languages: {}", locale.uiLanguages());
-    }
-
-    bool
-    loadTranslation(QTranslator& translator, const QString& filename, const QString& prefix, const QString& directory) {
-        // https://bugreports.qt.io/browse/QTBUG-129434
-        static const bool applyWorkaround = [] {
-            const bool apply = (QLibraryInfo::version() == QVersionNumber(6, 7, 3));
-            debug().log("Applying QTranslator workaround for Qt 6.7.3");
-            return apply;
-        }();
-        QLocale locale{};
-        if (applyWorkaround) {
-            QString actualFilename = filename + prefix + locale.name();
-            return translator.load(actualFilename, directory);
-        } else {
-            return translator.load(locale, filename, prefix, directory);
-        }
     }
 }
 
 int main(int argc, char** argv) {
     // This does not need QApplication instance, and we need it in windowsInitPrelude()
-    QCoreApplication::setOrganizationName(TREMOTESF_EXECUTABLE_NAME ""_l1);
+    QCoreApplication::setOrganizationName(TREMOTESF_EXECUTABLE_NAME ""_L1);
     QCoreApplication::setApplicationName(QCoreApplication::organizationName());
-    QCoreApplication::setApplicationVersion(TREMOTESF_VERSION ""_l1);
+    QCoreApplication::setApplicationVersion(TREMOTESF_VERSION ""_L1);
 
     //
     // Command line parsing
@@ -142,8 +122,8 @@ int main(int argc, char** argv) {
         if (args.exit) {
             return EXIT_SUCCESS;
         }
-    } catch (const std::runtime_error& e) {
-        warning().log("Failed to parse command line arguments: {}", e.what());
+    } catch (const std::exception& e) {
+        warning().logWithException(e, "Failed to parse command line arguments");
         return EXIT_FAILURE;
     }
 
@@ -170,10 +150,6 @@ int main(int argc, char** argv) {
     //
     // QApplication initialization
     //
-#if QT_VERSION_MAJOR < 6
-    QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
-    QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
-#endif
     const QApplication app(argc, argv);
 
     if (shouldExitBecauseAnotherInstanceIsRunning(args)) {
@@ -182,19 +158,14 @@ int main(int argc, char** argv) {
 
     QGuiApplication::setQuitOnLastWindowClosed(false);
 
-    // Workaround for application quitting when creating QFileDialog in KDE
-    // https://bugs.kde.org/show_bug.cgi?id=471941
-    // https://bugs.kde.org/show_bug.cgi?id=483439
-    QCoreApplication::setQuitLockEnabled(false);
-
 #ifdef Q_OS_WIN
     windowsInitApplication();
 #endif
 
     setupIconTheme();
 
-    QGuiApplication::setDesktopFileName(TREMOTESF_APP_ID ""_l1);
-    QGuiApplication::setWindowIcon(QIcon::fromTheme(TREMOTESF_APP_ID ""_l1));
+    QGuiApplication::setDesktopFileName(TREMOTESF_APP_ID ""_L1);
+    QGuiApplication::setWindowIcon(QIcon::fromTheme(TREMOTESF_APP_ID ""_L1));
     //
     // End of QApplication initialization
     //
@@ -205,17 +176,11 @@ int main(int argc, char** argv) {
     {
         const QString qtTranslationsPath =
 #ifdef TREMOTESF_USE_BUNDLED_QT_TRANSLATIONS
-            resolveExternalBundledResourcesPath("qt-translations"_l1);
+            resolveExternalBundledResourcesPath("qt-translations"_L1);
 #else
-#    if QT_VERSION_MAJOR >= 6
-            QLibraryInfo::path(
-#    else
-            QLibraryInfo::location(
-#    endif
-                QLibraryInfo::TranslationsPath
-            );
+            QLibraryInfo::path(QLibraryInfo::TranslationsPath);
 #endif
-        if (loadTranslation(qtTranslator, "qt"_l1, "_"_l1, qtTranslationsPath)) {
+        if (qtTranslator.load(QLocale{}, "qt"_L1, "_"_L1, qtTranslationsPath)) {
             info().log("Loaded Qt translation {}", qtTranslator.filePath());
             qApp->installTranslator(&qtTranslator);
         } else {
@@ -224,7 +189,7 @@ int main(int argc, char** argv) {
     }
 
     QTranslator appTranslator;
-    if (loadTranslation(appTranslator, {}, {}, ":/translations/"_l1)) {
+    if (appTranslator.load(QLocale{}, {}, {}, ":/translations/"_L1)) {
         info().log("Loaded Tremotesf translation {}", appTranslator.filePath());
         qApp->installTranslator(&appTranslator);
     } else {

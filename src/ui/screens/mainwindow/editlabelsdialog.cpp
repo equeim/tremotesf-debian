@@ -11,11 +11,10 @@
 #include "editlabelsdialog.h"
 #include "rpc/rpc.h"
 #include "rpc/torrent.h"
-#include "stdutils.h"
 #include "ui/widgets/editlabelswidget.h"
 
 namespace tremotesf {
-    EditLabelsDialog::EditLabelsDialog(const std::vector<Torrent*> selectedTorrents, Rpc* rpc, QWidget* parent)
+    EditLabelsDialog::EditLabelsDialog(const std::vector<Torrent*>& selectedTorrents, Rpc* rpc, QWidget* parent)
         : QDialog(parent) {
         setWindowTitle(qApp->translate("tremotesf", "Edit Labels"));
 
@@ -23,7 +22,7 @@ namespace tremotesf {
 
         auto enabledLabels = selectedTorrents.at(0)->data().labels;
         if (!enabledLabels.empty() && selectedTorrents.size() > 1) {
-            for (Torrent* torrent : std::views::drop(selectedTorrents, 1)) {
+            for (const Torrent* torrent : std::views::drop(selectedTorrents, 1)) {
                 if (torrent->data().labels != enabledLabels) {
                     enabledLabels.clear();
                     break;
@@ -33,8 +32,9 @@ namespace tremotesf {
         auto editLabelsWidget = new EditLabelsWidget(enabledLabels, rpc, this);
         layout->addWidget(editLabelsWidget);
 
-        auto torrentIds =
-            toContainer<std::vector>(selectedTorrents | std::views::transform([](Torrent* t) { return t->data().id; }));
+        auto torrentIds = selectedTorrents
+                          | std::views::transform([](Torrent* t) { return t->data().id; })
+                          | std::ranges::to<std::vector>();
 
         const auto saveLabels = [=, torrentIds = std::move(torrentIds)] {
             rpc->setTorrentsLabels(torrentIds, editLabelsWidget->enabledLabels());

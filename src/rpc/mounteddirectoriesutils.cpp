@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -8,7 +8,10 @@
 #include "serversettings.h"
 #include "servers.h"
 
+#include <QFileInfo>
 #include <QStringBuilder>
+
+using namespace Qt::StringLiterals;
 
 namespace tremotesf {
     bool isServerLocalOrTorrentIsMounted(const Rpc* rpc, const Torrent* torrent) {
@@ -42,10 +45,16 @@ namespace tremotesf {
             return {};
         }
         const auto& torrentName = torrent->data().name;
-        if (torrent->data().singleFile && torrent->data().leftUntilDone > 0 &&
-            rpc->serverSettings()->data().renameIncompleteFiles) {
-            return downloadDirectoryPath % '/' % torrentName % ".part"_l1;
+        QString rootFilePath = downloadDirectoryPath % '/' % torrentName;
+
+        if (rpc->serverSettings()->data().renameIncompleteFiles && torrent->data().leftUntilDone > 0) {
+            const QString incompleteRootFilePath = rootFilePath % ".part"_L1;
+            // Don't return incomplete file path unless it exists because we don't know whether it's supposed to be a directory or a file,
+            // and in case of directory this path can't exist so we don't want to try to open it
+            if (QFileInfo::exists(incompleteRootFilePath)) {
+                return incompleteRootFilePath;
+            }
         }
-        return downloadDirectoryPath % '/' % torrentName;
+        return rootFilePath;
     }
 }

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -9,7 +9,10 @@
 #include <QPointer>
 #include <QWidget>
 
+// Workarounds for winrt headers
+#include <exception>
 #include <guiddef.h>
+
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Storage.h>
@@ -28,11 +31,13 @@ namespace tremotesf {
             Q_OBJECT
 
         public:
+            WindowsFileManagerLauncher() = default;
             ~WindowsFileManagerLauncher() override {
                 if (mCoroutine) {
                     mCoroutine.Cancel();
                 }
             }
+            Q_DISABLE_COPY_MOVE(WindowsFileManagerLauncher)
 
         protected:
             void launchFileManagerAndSelectFiles(
@@ -58,8 +63,9 @@ namespace tremotesf {
                     const auto nativeFilePath = winrt::hstring(QDir::toNativeSeparators(filePath).toStdWString());
                     if (QFileInfo(filePath).isDir()) {
                         try {
-                            options.ItemsToSelect().Append(co_await StorageFolder::GetFolderFromPathAsync(nativeFilePath
-                            ));
+                            options.ItemsToSelect().Append(
+                                co_await StorageFolder::GetFolderFromPathAsync(nativeFilePath)
+                            );
                         } catch (const winrt::hresult_canceled&) {
                             throw;
                         } catch (const winrt::hresult_error& e) {

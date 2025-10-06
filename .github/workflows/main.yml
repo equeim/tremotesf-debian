@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+# SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 #
 # SPDX-License-Identifier: CC0-1.0
 
@@ -25,16 +25,13 @@ jobs:
         exclude:
         - container-image: 'opensuse/tumbleweed:latest'
           compiler: clang
-        # Bug in Clang 20, possibly https://github.com/llvm/llvm-project/issues/104525
-        - container-image: 'fedora:42'
-          compiler: clang
 
     runs-on: ubuntu-24.04${{ matrix.arch == 'arm64' && '-arm' || '' }}
     container: ${{ startsWith(matrix.container-image, 'fedora') && 'registry.fedoraproject.org' || 'registry.opensuse.org' }}/${{ matrix.container-image }}
 
     steps:
     - name: Add GCC problem matcher
-      uses: ammaraskar/gcc-problem-matcher@master
+      uses: ammaraskar/gcc-problem-matcher@0f9c86f9e693db67dacf53986e1674de5f2e5f28
 
     - name: Set packages install command for dnf
       if: startsWith(matrix.container-image, 'fedora')
@@ -54,7 +51,7 @@ jobs:
       run: ${{env.INSTALL_PACKAGES}} git rpm-build
 
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
       with:
         submodules: 'recursive'
 
@@ -90,7 +87,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        container-image: ['debian:12', 'ubuntu:24.04', 'ubuntu:25.04']
+        container-image: ['debian:13', 'ubuntu:25.04']
         arch: ['x86_64', 'arm64']
 
     runs-on: ubuntu-24.04${{ matrix.arch == 'arm64' && '-arm' || '' }}
@@ -98,14 +95,14 @@ jobs:
 
     steps:
     - name: Add GCC problem matcher
-      uses: ammaraskar/gcc-problem-matcher@master
+      uses: ammaraskar/gcc-problem-matcher@0f9c86f9e693db67dacf53986e1674de5f2e5f28
 
     - name: Install dependencies needed to make source archive
       run: |
         apt-get update && DEBIAN_FRONTEND=noninteractive apt-get --no-install-recommends --assume-yes install ca-certificates git python3 cmake
 
     - name: Check out sources
-      uses: actions/checkout@v4
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
       with:
         submodules: 'recursive'
 
@@ -116,7 +113,7 @@ jobs:
         .github/workflows/make-source-archive.py --output-directory .. --debian gzip
 
     - name: Check out Debian sources
-      uses: actions/checkout@v4
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
       with:
         repository: equeim/tremotesf-debian
         path: tremotesf-debian
@@ -148,16 +145,15 @@ jobs:
 
     steps:
     - name: Add GCC problem matcher
-      uses: ammaraskar/gcc-problem-matcher@master
+      uses: ammaraskar/gcc-problem-matcher@0f9c86f9e693db67dacf53986e1674de5f2e5f28
 
     - name: Set up Flatpak
       run: |
-        sudo add-apt-repository -y ppa:flatpak/stable
         sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get --assume-yes install flatpak flatpak-builder
         flatpak remote-add --user --if-not-exists flathub 'https://flathub.org/repo/flathub.flatpakrepo'
 
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
       with:
         submodules: 'recursive'
 
@@ -176,24 +172,24 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        #toolchain: ['msvc', 'msvc-clang']
-        # Enable clang after fmt in vcpkg is updated to 11.1
-        toolchain: ['msvc']
+        toolchain: ['msvc', 'msvc-clang']
     uses: ./.github/workflows/build-windows-msvc.yml
     with:
       toolchain: ${{ matrix.toolchain  }}
 
   build-windows-mingw:
     runs-on: windows-latest
+    # https://gitlab.kitware.com/cmake/cmake/-/issues/27152
+    if: false
 
     steps:
     - name: Checkout Tremotesf
-      uses: actions/checkout@v4
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
       with:
         submodules: 'recursive'
 
     - name: Set up MSYS2
-      uses: msys2/setup-msys2@v2
+      uses: msys2/setup-msys2@fb197b72ce45fb24f17bf3f807a388985654d1f2
       with:
         msystem: 'CLANG64'
         update: 'true'
@@ -217,7 +213,7 @@ jobs:
           cppwinrt -input sdk -output /clang64/include
 
     - name: Add GCC problem matcher
-      uses: ammaraskar/gcc-problem-matcher@master
+      uses: ammaraskar/gcc-problem-matcher@0f9c86f9e693db67dacf53986e1674de5f2e5f28
 
     - name: Build with LLVM MinGW toolchain
       shell: msys2 {0}
@@ -225,7 +221,7 @@ jobs:
           set -e -o pipefail
           echo '::group::Configuring CMake'
           # ASAN + LTO causes linker crash
-          cmake -S . --preset base -D TREMOTESF_QT6=ON -D TREMOTESF_WITH_HTTPLIB=bundled -D TREMOTESF_ASAN=ON -D CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE=OFF
+          cmake -S . --preset base -D TREMOTESF_WITH_HTTPLIB=bundled -D TREMOTESF_ASAN=ON -D CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE=OFF
           echo '::endgroup'
           echo '::group::Building Debug'
           cmake --build --preset base-debug -v
@@ -239,6 +235,8 @@ jobs:
           echo '::group::Testing Release'
           ctest --preset base-release
           echo '::endgroup'
+      env:
+        QT_FORCE_STDERR_LOGGING: 1
 
   build-macos:
     uses: ./.github/workflows/build-macos.yml
@@ -247,7 +245,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Check out
-      uses: actions/checkout@v4
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
 
     - name: Check REUSE compliance
       run: |

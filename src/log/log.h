@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -31,7 +31,7 @@
 #    define ALWAYS_INLINE [[gnu::always_inline]] inline
 #elif __has_cpp_attribute(msvc::forceinline)
 #    define ALWAYS_INLINE [[msvc::forceinline]] inline
-#elif defined(_MSC_VER)
+#elifdef _MSC_VER
 #    define ALWAYS_INLINE __forceinline
 #else
 #    define ALWAYS_INLINE inline
@@ -48,11 +48,8 @@ namespace tremotesf {
 
         template<typename T>
         concept IsQStringView = std::same_as<std::remove_cvref_t<T>, QStringView>
-#if QT_VERSION_MAJOR >= 6
-                                || std::same_as<std::remove_cvref_t<T>, QUtf8StringView> ||
-                                std::same_as<std::remove_cvref_t<T>, QAnyStringView>
-#endif
-            ;
+                                || std::same_as<std::remove_cvref_t<T>, QUtf8StringView>
+                                || std::same_as<std::remove_cvref_t<T>, QAnyStringView>;
 
         template<std::convertible_to<QString> T>
         ALWAYS_INLINE QString convertToQString(const T& string) {
@@ -72,8 +69,8 @@ namespace tremotesf {
         }
 
         template<typename T>
-        concept CanConvertToQString = !std::same_as<std::remove_cvref_t<T>, QString> &&
-                                      requires(T string) { tremotesf::impl::convertToQString(string); };
+        concept CanConvertToQString = !std::same_as<std::remove_cvref_t<T>, QString>
+                                      && requires(T string) { tremotesf::impl::convertToQString(string); };
 
         inline void printNewline(FILE* stream) { std::fwrite("\n", 1, 1, stream); }
     }
@@ -120,7 +117,7 @@ namespace tremotesf {
         ALWAYS_INLINE void log(const T& value) const {
             if (isEnabled()) {
                 logWithFormatArgs(
-                    fmt::format_string<const T&>(impl::singleArgumentFormatString),
+                    fmt::format_string<const T&>(singleArgumentFormatString),
                     fmt::make_format_args(value)
                 );
             }
@@ -155,11 +152,7 @@ namespace tremotesf {
             if (isEnabled()) {
                 auto message = formatToQString(fmt, fmt::make_format_args(args...));
                 message += '\n';
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
                 message += formatExceptionRecursively(e);
-#else
-                message += formatExceptionRecursively(e).c_str();
-#endif
                 logImpl(message);
             }
         }
@@ -197,7 +190,7 @@ namespace tremotesf {
 
     template<typename T>
     ALWAYS_INLINE void printlnStdout(const T& value) {
-        fmt::print(stdout, fmt::format_string<const T&>(impl::singleArgumentFormatString), value);
+        fmt::print(stdout, fmt::format_string<const T&>(singleArgumentFormatString), value);
         impl::printNewline(stdout);
     }
 

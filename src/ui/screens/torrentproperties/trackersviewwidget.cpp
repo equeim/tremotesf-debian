@@ -1,10 +1,11 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "trackersviewwidget.h"
 
 #include <array>
+#include <ranges>
 
 #include <QCoreApplication>
 #include <QHBoxLayout>
@@ -15,11 +16,11 @@
 #include <QMenu>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QTreeView>
 #include <QVBoxLayout>
 
 #include "rpc/torrent.h"
 #include "rpc/tracker.h"
-#include "stdutils.h"
 #include "ui/itemmodels/baseproxymodel.h"
 #include "ui/widgets/basetreeview.h"
 #include "ui/widgets/textinputdialog.h"
@@ -27,17 +28,19 @@
 #include "settings.h"
 #include "trackersmodel.h"
 
+using namespace Qt::StringLiterals;
+
 namespace tremotesf {
     namespace {
-        class EnterEatingTreeView final : public BaseTreeView {
+        class EnterEatingTreeView final : public QTreeView {
             Q_OBJECT
 
         public:
-            explicit EnterEatingTreeView(QWidget* parent = nullptr) : BaseTreeView(parent) {}
+            explicit EnterEatingTreeView(QWidget* parent = nullptr) : QTreeView(parent) {}
 
         protected:
             void keyPressEvent(QKeyEvent* event) override {
-                BaseTreeView::keyPressEvent(event);
+                QTreeView::keyPressEvent(event);
                 switch (event->key()) {
                 case Qt::Key_Enter:
                 case Qt::Key_Return:
@@ -59,15 +62,15 @@ namespace tremotesf {
           mTrackersView(new EnterEatingTreeView(this)) {
         auto layout = new QHBoxLayout(this);
 
+        setCommonTreeViewProperties(mTrackersView, true);
         mTrackersView->setContextMenuPolicy(Qt::CustomContextMenu);
         mTrackersView->setModel(mProxyModel);
         mTrackersView->setSelectionMode(QAbstractItemView::ExtendedSelection);
-        mTrackersView->setRootIsDecorated(false);
         mTrackersView->header()->restoreState(Settings::instance()->get_trackersViewHeaderState());
         QObject::connect(mTrackersView, &EnterEatingTreeView::activated, this, &TrackersViewWidget::showEditDialogs);
 
         auto removeAction = new QAction(
-            QIcon::fromTheme("list-remove"_l1),
+            QIcon::fromTheme("list-remove"_L1),
             //: Tracker's context menu item
             qApp->translate("tremotesf", "&Remove"),
             this
@@ -79,8 +82,8 @@ namespace tremotesf {
         QObject::connect(mTrackersView, &EnterEatingTreeView::customContextMenuRequested, this, [=, this](QPoint pos) {
             if (mTrackersView->indexAt(pos).isValid()) {
                 QMenu contextMenu;
-                QAction* editAction = contextMenu.addAction(
-                    QIcon::fromTheme("document-properties"_l1),
+                const auto* const editAction = contextMenu.addAction(
+                    QIcon::fromTheme("document-properties"_L1),
                     //: Tracker's context menu item
                     qApp->translate("tremotesf", "&Edit...")
                 );
@@ -95,7 +98,7 @@ namespace tremotesf {
         auto buttonsLayout = new QVBoxLayout();
         layout->addLayout(buttonsLayout);
         auto addTrackersButton = new QPushButton(
-            QIcon::fromTheme("list-add"_l1),
+            QIcon::fromTheme("list-add"_L1),
             //: Button
             qApp->translate("tremotesf", "Add..."),
             this
@@ -103,7 +106,7 @@ namespace tremotesf {
         QObject::connect(addTrackersButton, &QPushButton::clicked, this, &TrackersViewWidget::addTrackers);
         buttonsLayout->addWidget(addTrackersButton);
         auto editButton = new QPushButton(
-            QIcon::fromTheme("document-properties"_l1),
+            QIcon::fromTheme("document-properties"_L1),
             //: Button
             qApp->translate("tremotesf", "Edit..."),
             this
@@ -112,7 +115,7 @@ namespace tremotesf {
         editButton->setEnabled(false);
         buttonsLayout->addWidget(editButton);
         auto removeButton = new QPushButton(
-            QIcon::fromTheme("list-remove"_l1),
+            QIcon::fromTheme("list-remove"_L1),
             //: Button
             qApp->translate("tremotesf", "Remove"),
             this
@@ -121,7 +124,7 @@ namespace tremotesf {
         QObject::connect(removeButton, &QPushButton::clicked, this, &TrackersViewWidget::removeTrackers);
         buttonsLayout->addWidget(removeButton);
         auto reannounceButton = new QPushButton(
-            QIcon::fromTheme("view-refresh"_l1),
+            QIcon::fromTheme("view-refresh"_L1),
             //: Button
             qApp->translate("tremotesf", "Reanno&unce"),
             this
@@ -161,9 +164,11 @@ namespace tremotesf {
         );
         QObject::connect(dialog, &TextInputDialog::accepted, this, [=, this] {
             auto lines = dialog->text().split('\n', Qt::SkipEmptyParts);
-            mTorrent->addTrackers(toContainer<std::vector>(lines | std::views::transform([](QString& announceUrl) {
-                                                               return std::set{std::move(announceUrl)};
-                                                           })));
+            mTorrent->addTrackers(
+                lines
+                | std::views::transform([](QString& announceUrl) { return std::set{std::move(announceUrl)}; })
+                | std::ranges::to<std::vector>()
+            );
         });
         dialog->show();
     }
@@ -171,7 +176,7 @@ namespace tremotesf {
     void TrackersViewWidget::showEditDialogs() {
         const QModelIndexList indexes(mTrackersView->selectionModel()->selectedRows());
         for (const QModelIndex& index : indexes) {
-            const Tracker& tracker = mModel->trackerAtIndex(mProxyModel->sourceIndex(index));
+            const Tracker& tracker = mModel->trackerAtIndex(mProxyModel->mapToSource(index));
             const int id = tracker.id();
             auto dialog = new TextInputDialog(
                 //: Dialog title

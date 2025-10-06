@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -40,7 +40,6 @@ namespace tremotesf {
         [[nodiscard]] bool hasSessionIdFile() const;
         [[nodiscard]] bool hasTableMode() const;
         [[nodiscard]] bool hasTrackerListProperty() const;
-        [[nodiscard]] bool hasFileCountProperty() const;
         [[nodiscard]] bool hasLabelsProperty() const;
 
         int rpcVersion = 0;

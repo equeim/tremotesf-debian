@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+# SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 #
 # SPDX-License-Identifier: CC0-1.0
 
@@ -26,29 +26,29 @@ jobs:
         arch:
           - msvc-arch: amd64
             cmake-preset-arch: x86_64
-          - msvc-arch: amd64_arm64
+          - msvc-arch: arm64
             cmake-preset-arch: arm64
 
-    runs-on: windows-latest
+    runs-on: ${{ matrix.arch.cmake-preset-arch == 'arm64' && 'windows-11-arm' || 'windows-2025' }}
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
       with:
         submodules: 'recursive'
 
+    - name: Install WiX
+      run: |
+        dotnet tool install --global wix
+        wix extension add --global WixToolset.UI.wixext
+
     - name: Set up MSVC environment
-      uses: equeim/action-setup-msvc-environment@v1
+      uses: equeim/action-setup-msvc-environment@5d989fa1a8d416d51b2089554f07a5233cb76a77
       with:
         arch: ${{ matrix.arch.msvc-arch }}
 
-    - name: Upgrade LLVM
-      if: inputs.toolchain == 'msvc-clang'
-      run: |
-        choco upgrade llvm
-
     - name: Set up vcpkg
-      uses: equeim/action-setup-vcpkg@v6
+      uses: equeim/action-setup-vcpkg@ee4e4882f5d857900b56e5a6b000930d99cca824
       with:
         vcpkg-root: ${{ github.workspace }}\vcpkg
         binary-cache-path: ${{ github.workspace }}\vcpkg_binary_cache
@@ -57,15 +57,16 @@ jobs:
 
     - name: Build Tremotesf with ${{ inputs.toolchain }} toolchain for ${{ matrix.arch.cmake-preset-arch }} architecture
       id: build
-      uses: equeim/action-cmake-build@v10
+      uses: equeim/action-cmake-build@ad8fb686c1e3e022cc3044377a966a027f5678e4
       with:
         cmake-arguments: --preset windows-${{ matrix.arch.cmake-preset-arch }}-${{ inputs.toolchain }}-vcpkg -D VCPKG_INSTALLED_DIR=${{ github.workspace }}/vcpkg_installed -D TREMOTESF_ASAN=${{ inputs.release-tag == '' && inputs.toolchain == 'msvc' && 'ON' || 'OFF' }}
         package: true
-        test: ${{ matrix.arch.cmake-preset-arch == 'x86_64' }}
+      env:
+        QT_FORCE_STDERR_LOGGING: 1
 
     - name: Archive packages
       if: inputs.release-tag == ''
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       with:
         name: 'windows-${{ matrix.arch.cmake-preset-arch }}-${{ inputs.toolchain }}-packages'
         retention-days: ${{ github.event_name == 'push' && 7 || 3 }}
@@ -83,7 +84,7 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Archive build logs
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       if: always()
       with:
         name: 'windows-${{ matrix.arch.cmake-preset-arch }}-${{ inputs.toolchain }}-build-logs'

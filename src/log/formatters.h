@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -7,7 +7,7 @@
 
 #include <concepts>
 #include <cstdint>
-#include <stdexcept>
+#include <exception>
 #include <system_error>
 #include <type_traits>
 
@@ -15,9 +15,7 @@
 #include <QMetaEnum>
 #include <QObject>
 #include <QString>
-#if QT_VERSION_MAJOR >= 6
-#    include <QUtf8StringView>
-#endif
+#include <qstringfwd.h>
 
 #if FMT_VERSION_MAJOR >= 11
 #    include <fmt/base.h>
@@ -36,38 +34,37 @@ struct fmt::formatter<QString> : formatter<string_view> {
     format_context::iterator format(const QString& string, format_context& ctx) const;
 };
 
-class QStringView;
 template<>
 struct fmt::formatter<QStringView> : formatter<string_view> {
-    format_context::iterator format(const QStringView& string, format_context& ctx) const;
+    format_context::iterator format(QStringView string, format_context& ctx) const;
 };
 
-class QLatin1String;
 template<>
 struct fmt::formatter<QLatin1String> : formatter<string_view> {
-    format_context::iterator format(const QLatin1String& string, format_context& ctx) const;
+    format_context::iterator format(QLatin1String string, format_context& ctx) const;
 };
 
-class QByteArray;
 template<>
 struct fmt::formatter<QByteArray> : formatter<string_view> {
     format_context::iterator format(const QByteArray& array, format_context& ctx) const;
 };
 
-#if QT_VERSION_MAJOR >= 6
+template<>
+struct fmt::formatter<QByteArrayView> : formatter<string_view> {
+    format_context::iterator format(QByteArrayView array, format_context& ctx) const;
+};
+
 template<>
 struct fmt::formatter<QUtf8StringView> : formatter<string_view> {
-    format_context::iterator format(const QUtf8StringView& string, format_context& ctx) const;
+    format_context::iterator format(QUtf8StringView string, format_context& ctx) const;
 };
 
-class QAnyStringView;
 template<>
 struct fmt::formatter<QAnyStringView> : formatter<QString> {
-    format_context::iterator format(const QAnyStringView& string, format_context& ctx) const;
+    format_context::iterator format(QAnyStringView string, format_context& ctx) const;
 };
-#endif
 
-namespace tremotesf::impl {
+namespace tremotesf {
     inline constexpr auto singleArgumentFormatString = "{}";
 
     template<typename T>
@@ -87,8 +84,8 @@ namespace tremotesf::impl {
     template<typename T>
     concept QEnum = std::is_enum_v<T> && requires { qt_getEnumMetaObject(T{}); };
 
-    fmt::format_context::iterator formatQEnum(const QMetaEnum& meta, std::intmax_t value, fmt::format_context& ctx);
-    fmt::format_context::iterator formatQEnum(const QMetaEnum& meta, std::uintmax_t value, fmt::format_context& ctx);
+    fmt::format_context::iterator formatQEnum(QMetaEnum meta, std::intmax_t value, fmt::format_context& ctx);
+    fmt::format_context::iterator formatQEnum(QMetaEnum meta, std::uintmax_t value, fmt::format_context& ctx);
 }
 
 namespace fmt {
@@ -98,27 +95,27 @@ namespace fmt {
             QString buffer{};
             QDebug stream(&buffer);
             stream.nospace() << &object;
-            return fmt::format_to(ctx.out(), tremotesf::impl::singleArgumentFormatString, buffer);
+            return fmt::format_to(ctx.out(), tremotesf::singleArgumentFormatString, buffer);
         }
     };
 
-    template<tremotesf::impl::QEnum T>
+    template<tremotesf::QEnum T>
     struct formatter<T> : tremotesf::SimpleFormatter {
         fmt::format_context::iterator format(T t, fmt::format_context& ctx) const {
             const auto meta = QMetaEnum::fromType<T>();
             if constexpr (std::signed_integral<std::underlying_type_t<T>>) {
-                return tremotesf::impl::formatQEnum(meta, static_cast<std::intmax_t>(t), ctx);
+                return tremotesf::formatQEnum(meta, static_cast<std::intmax_t>(t), ctx);
             } else {
-                return tremotesf::impl::formatQEnum(meta, static_cast<std::uintmax_t>(t), ctx);
+                return tremotesf::formatQEnum(meta, static_cast<std::uintmax_t>(t), ctx);
             }
         }
     };
 }
 
-#define SPECIALIZE_FORMATTER_FOR_QDEBUG(Class)                                \
-    namespace fmt {                                                           \
-        template<>                                                            \
-        struct formatter<Class> : tremotesf::impl::QDebugFormatter<Class> {}; \
+#define SPECIALIZE_FORMATTER_FOR_QDEBUG(Class)                          \
+    namespace fmt {                                                     \
+        template<>                                                      \
+        struct formatter<Class> : tremotesf::QDebugFormatter<Class> {}; \
     }
 
 #define DISABLE_RANGE_FORMATTING(Class)                          \

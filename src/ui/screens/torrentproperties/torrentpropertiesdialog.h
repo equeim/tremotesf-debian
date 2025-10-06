@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -19,6 +19,7 @@ namespace tremotesf {
 
     public:
         explicit TorrentPropertiesDialog(Torrent* torrent, Rpc* rpc, QWidget* parent = nullptr);
+        ~TorrentPropertiesDialog() override = default;
         Q_DISABLE_COPY_MOVE(TorrentPropertiesDialog)
 
     private:

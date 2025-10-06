@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -27,8 +27,8 @@ namespace tremotesf {
             bencode::Integer size;
 
             std::ranges::view auto path() {
-                return mPath |
-                       std::views::transform([](bencode::Value& value) { return std::move(value).takeString(); });
+                return mPath
+                       | std::views::transform([](bencode::Value& value) { return std::move(value).takeString(); });
             }
 
         private:
@@ -45,8 +45,8 @@ namespace tremotesf {
         inline bencode::Integer singleFileSize() const { return std::get<bencode::Integer>(mSingleFileSizeOrFiles); }
 
         inline std::ranges::view auto files() {
-            return std::get<bencode::List>(mSingleFileSizeOrFiles) |
-                   std::views::transform([](bencode::Value& value) { return File(std::move(value)); });
+            return std::get<bencode::List>(mSingleFileSizeOrFiles)
+                   | std::views::transform([](bencode::Value& value) { return File(std::move(value)); });
         }
 
     private:
