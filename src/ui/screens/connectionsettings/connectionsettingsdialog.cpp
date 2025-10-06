@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -20,10 +20,12 @@
 #include "ui/itemmodels/baseproxymodel.h"
 #include "ui/widgets/listplaceholder.h"
 
+using namespace Qt::StringLiterals;
+
 namespace tremotesf {
     namespace {
-        constexpr auto editIconName = "document-properties"_l1;
-        constexpr auto removeIconName = "list-remove"_l1;
+        constexpr auto editIconName = "document-properties"_L1;
+        constexpr auto removeIconName = "list-remove"_L1;
     }
 
     ConnectionSettingsDialog::ConnectionSettingsDialog(QWidget* parent)
@@ -35,7 +37,7 @@ namespace tremotesf {
         //: Dialog title
         setWindowTitle(qApp->translate("tremotesf", "Connection Settings"));
 
-        mProxyModel->sort();
+        mProxyModel->sort(0);
 
         auto layout = new QGridLayout(this);
 
@@ -57,7 +59,7 @@ namespace tremotesf {
         QObject::connect(mServersView, &QListView::customContextMenuRequested, this, [=, this](QPoint pos) {
             if (mServersView->indexAt(pos).isValid()) {
                 QMenu contextMenu;
-                QAction* editAction = contextMenu.addAction(
+                const auto* const editAction = contextMenu.addAction(
                     QIcon::fromTheme(editIconName),
                     //: Server's context menu item
                     qApp->translate("tremotesf", "&Edit...")
@@ -76,7 +78,7 @@ namespace tremotesf {
         auto buttonsLayout = new QVBoxLayout();
         layout->addLayout(buttonsLayout, 0, 1);
         auto addServerButton = new QPushButton(
-            QIcon::fromTheme("list-add"_l1),
+            QIcon::fromTheme("list-add"_L1),
             //: Button
             qApp->translate("tremotesf", "Add Server..."),
             this
@@ -129,7 +131,7 @@ namespace tremotesf {
     void ConnectionSettingsDialog::showEditDialogs() {
         const QModelIndexList indexes(mServersView->selectionModel()->selectedIndexes());
         for (const QModelIndex& index : indexes) {
-            auto dialog = new ServerEditDialog(mModel, mProxyModel->sourceIndex(index).row(), this);
+            auto dialog = new ServerEditDialog(mModel, mProxyModel->mapToSource(index).row(), this);
             dialog->setAttribute(Qt::WA_DeleteOnClose);
             dialog->show();
         }
@@ -138,7 +140,7 @@ namespace tremotesf {
     void ConnectionSettingsDialog::removeServers() {
         while (mServersView->selectionModel()->hasSelection()) {
             mModel->removeServerAtIndex(
-                mProxyModel->sourceIndex(mServersView->selectionModel()->selectedIndexes().first())
+                mProxyModel->mapToSource(mServersView->selectionModel()->selectedIndexes().first())
             );
         }
     }

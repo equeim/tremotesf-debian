@@ -1,19 +1,22 @@
-# SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+# SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 #
 # SPDX-License-Identifier: CC0-1.0
 
 cmake_minimum_required(VERSION 3.25)
-cmake_policy(VERSION ${CMAKE_MINIMUM_REQUIRED_VERSION}...3.31)
+cmake_policy(VERSION ${CMAKE_MINIMUM_REQUIRED_VERSION}...4.1)
+
+include(cmake/VcpkgHostTriplet.cmake)
 
 set(languages CXX)
 if (APPLE)
-    include(cmake/MacOSInitialSetup.cmake)
     list(APPEND languages OBJCXX)
+    include(cmake/MacOSDeploymentTarget.cmake)
+    message(STATUS "Setting CMAKE_OSX_DEPLOYMENT_TARGET to ${TREMOTESF_MACOS_DEPLOYMENT_TARGET}")
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "${TREMOTESF_MACOS_DEPLOYMENT_TARGET}")
 endif ()
 
-project(tremotesf VERSION 2.8.2 LANGUAGES ${languages})
+project(tremotesf VERSION 2.9.0 LANGUAGES ${languages})
 
-option(TREMOTESF_QT6 "Build with Qt 6" ON)
 option(TREMOTESF_ASAN "Build with AddressSanitizer" OFF)
 
 set(TREMOTESF_WITH_HTTPLIB "auto" CACHE STRING "Where to find cpp-httplib dependency for unit tests. Possible values are: auto, system, bundled, none")
@@ -28,9 +31,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(cmake/CommonOptions.cmake)
 
-find_package(Qt${TREMOTESF_QT_VERSION_MAJOR} ${TREMOTESF_MINIMUM_QT_VERSION} REQUIRED COMPONENTS Core)
+find_package(Qt6 ${TREMOTESF_MINIMUM_QT_VERSION} REQUIRED COMPONENTS Core)
 
-set(QRC_FILES "")
 if (APPLE)
     set(TREMOTESF_MACOS_BUNDLE_NAME "Tremotesf")
     set(TREMOTESF_EXTERNAL_RESOURCES_PATH "${TREMOTESF_MACOS_BUNDLE_NAME}.app/Contents/Resources")
@@ -38,7 +40,7 @@ elseif (WIN32)
     set(TREMOTESF_EXTERNAL_RESOURCES_PATH ".")
 endif ()
 
+add_subdirectory("src")
 add_subdirectory("data")
 add_subdirectory("translations")
-add_subdirectory("src")
 add_subdirectory("packaging")

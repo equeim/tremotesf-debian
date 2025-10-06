@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 // SPDX-FileCopyrightText: 2021 LuK1337
 // SPDX-FileCopyrightText: 2022 Alex <tabell@users.noreply.github.com>
 //
@@ -10,22 +10,21 @@
 #include <QMetaEnum>
 #include <QSettings>
 
-#if QT_VERSION_MAJOR < 6
-#    include <QDataStream>
-#endif
-
 #include "log/log.h"
-#include "literals.h"
 #include "target_os.h"
 
+using namespace Qt::StringLiterals;
+
 #define SETTINGS_PROPERTY_DEF(type, name, key, defaultValue)                                                 \
-    const QVariant& name##_defaultValue() {                                                                  \
-        static const auto v = QVariant::fromValue<type>(defaultValue);                                       \
-        return v;                                                                                            \
+    namespace {                                                                                              \
+        const QVariant& name##_defaultValue() {                                                              \
+            static const auto v = QVariant::fromValue<type>(defaultValue);                                   \
+            return v;                                                                                        \
+        }                                                                                                    \
     }                                                                                                        \
-    type Settings::get_##name() const { return getValue<type>(mSettings, key##_l1, name##_defaultValue()); } \
+    type Settings::get_##name() const { return getValue<type>(mSettings, key##_L1, name##_defaultValue()); } \
     void Settings::set_##name(type value) {                                                                  \
-        if (setValue<type>(mSettings, key##_l1, std::move(value), name##_defaultValue())) {                  \
+        if (setValue<type>(mSettings, key##_L1, std::move(value), name##_defaultValue())) {                  \
             emit name##Changed();                                                                            \
         }                                                                                                    \
     }
@@ -52,10 +51,10 @@ namespace tremotesf {
         }
 
         template<typename T>
-        bool setValue(QSettings* settings, QLatin1String key, T newValue, const QVariant& defaultValue) {
+        bool setValue(QSettings* settings, QLatin1String key, T&& newValue, const QVariant& defaultValue) {
             const auto currentValue = getValue<T>(settings, key, defaultValue);
             if (newValue != currentValue) {
-                settings->setValue(key, QVariant::fromValue<T>(newValue));
+                settings->setValue(key, QVariant::fromValue<T>(std::forward<T>(newValue)));
                 return true;
             }
             return false;
@@ -173,13 +172,6 @@ namespace tremotesf {
         qRegisterMetaType<TorrentsProxyModel::StatusFilter>();
         qRegisterMetaType<Settings::DarkThemeMode>();
         qRegisterMetaType<Settings::TorrentDoubleClickAction>();
-#if QT_VERSION_MAJOR < 6
-        qRegisterMetaTypeStreamOperators<Qt::ToolButtonStyle>();
-        qRegisterMetaTypeStreamOperators<TorrentData::Priority>();
-        qRegisterMetaTypeStreamOperators<TorrentsProxyModel::StatusFilter>();
-        qRegisterMetaTypeStreamOperators<Settings::DarkThemeMode>();
-        qRegisterMetaTypeStreamOperators<Settings::TorrentDoubleClickAction>();
-#endif
     }
 
     void Settings::sync() { mSettings->sync(); }

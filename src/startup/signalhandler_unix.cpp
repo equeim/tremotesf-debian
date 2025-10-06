@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -42,10 +42,12 @@ namespace tremotesf {
             return std::nullopt;
         }
 
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
         int writeSocket{};
 
-        // Not using std::atomic<std::optional<int>> because Clang might require linking to libatomic
         constexpr int notReceivedSignal = std::numeric_limits<int>::min();
+        // Not using std::atomic<std::optional<int>> because Clang might require linking to libatomic
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
         std::atomic_int receivedSignal{notReceivedSignal};
         static_assert(std::atomic_int::is_always_lock_free, "std::atomic_int must be lock-free");
 
@@ -70,12 +72,12 @@ namespace tremotesf {
     public:
         Impl() {
             try {
-                int sockets[2]{};
-                checkPosixError(socketpair(AF_UNIX, SOCK_STREAM, 0, static_cast<int*>(sockets)), "socketpair");
+                std::array<int, 2> sockets{};
+                checkPosixError(socketpair(AF_UNIX, SOCK_STREAM, 0, sockets.data()), "socketpair");
                 writeSocket = sockets[0];
                 const int readSocket = sockets[1];
 
-                struct sigaction action {};
+                struct sigaction action{};
                 action.sa_handler = signalHandler;
                 action.sa_flags |= SA_RESTART;
                 for (auto [signal, _] : expectedSignals) {
@@ -140,7 +142,7 @@ namespace tremotesf {
                 }
                 break;
             }
-            if (int signal = receivedSignal; signal != notReceivedSignal) {
+            if (const int signal = receivedSignal; signal != notReceivedSignal) {
                 if (const auto name = signalName(signal); name.has_value()) {
                     info().log("signalhandler: received signal {}", *name);
                 } else {

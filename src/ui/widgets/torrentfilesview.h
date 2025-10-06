@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -7,7 +7,7 @@
 
 #include <functional>
 
-#include "basetreeview.h"
+#include <QTreeView>
 
 namespace tremotesf {
     class BaseTorrentFilesModel;
@@ -16,12 +16,13 @@ namespace tremotesf {
     class TorrentFilesModel;
     class TorrentFilesProxyModel;
 
-    class TorrentFilesView final : public BaseTreeView {
+    class TorrentFilesView final : public QTreeView {
         Q_OBJECT
 
     public:
         explicit TorrentFilesView(LocalTorrentFilesModel* model, Rpc* rpc, QWidget* parent = nullptr);
         explicit TorrentFilesView(TorrentFilesModel* model, Rpc* rpc, QWidget* parent = nullptr);
+        ~TorrentFilesView() override = default;
         Q_DISABLE_COPY_MOVE(TorrentFilesView)
 
         static void showFileRenameDialog(

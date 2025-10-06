@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -13,16 +13,16 @@ class QWidget;
 namespace tremotesf::desktoputils {
     constexpr int defaultDbusTimeout = 2000; // 2 seconds
 
-    enum StatusIcon {
-        ActiveIcon,
-        CheckingIcon,
-        DownloadingIcon,
-        ErroredIcon,
-        PausedIcon,
-        QueuedIcon,
-        SeedingIcon,
-        StalledDownloadingIcon,
-        StalledSeedingIcon
+    enum class StatusIcon {
+        Active,
+        Checking,
+        Downloading,
+        Errored,
+        Paused,
+        Queued,
+        Seeding,
+        StalledDownloading,
+        StalledSeeding
     };
     const QIcon& statusIcon(StatusIcon icon);
 

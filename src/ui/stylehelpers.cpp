@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -8,8 +8,9 @@
 #include <QApplication>
 #include <QProxyStyle>
 
-#include "literals.h"
 #include "target_os.h"
+
+using namespace Qt::StringLiterals;
 
 namespace tremotesf {
     namespace {
@@ -30,17 +31,13 @@ namespace tremotesf {
 
     std::optional<KnownStyle> determineStyle(const QStyle* style) {
         style = baseStyle(style);
-#if QT_VERSION_MAJOR >= 6
         const auto name = style->name();
-#else
-        const auto name = style->objectName();
-#endif
         if constexpr (targetOs == TargetOs::UnixMacOS) {
-            if (name.compare("macos"_l1, Qt::CaseInsensitive) == 0) {
+            if (name.compare("macos"_L1, Qt::CaseInsensitive) == 0) {
                 return KnownStyle::macOS;
             }
         }
-        if (name.compare("breeze"_l1, Qt::CaseInsensitive) == 0) {
+        if (name.compare("breeze"_L1, Qt::CaseInsensitive) == 0) {
             return KnownStyle::Breeze;
         }
         return std::nullopt;

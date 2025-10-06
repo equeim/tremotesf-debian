@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -9,13 +9,10 @@
 // If we don't include it here we will get undefined reference link error for fmt::formatter<fmt::string_view>
 #include <fmt/format.h>
 
+#include <QAnyStringView>
 #include <QByteArray>
 #include <QLatin1String>
 #include <QStringView>
-
-#if QT_VERSION_MAJOR >= 6
-#    include <QAnyStringView>
-#endif
 
 #ifdef Q_OS_WIN
 #    include <guiddef.h>
@@ -24,9 +21,9 @@
 
 #include "demangle.h"
 
-namespace tremotesf::impl {
+namespace {
     template<std::integral Integer>
-    fmt::format_context::iterator formatQEnumImpl(const QMetaEnum& meta, Integer value, fmt::format_context& ctx) {
+    fmt::format_context::iterator formatQEnumImpl(QMetaEnum meta, Integer value, fmt::format_context& ctx) {
         const auto named =
 #if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
             meta.valueToKey(static_cast<quint64>(value));
@@ -41,18 +38,20 @@ namespace tremotesf::impl {
         }();
         return fmt::format_to(ctx.out(), "{}::{}::{}", meta.scope(), meta.enumName(), string);
     }
+}
 
-    fmt::format_context::iterator formatQEnum(const QMetaEnum& meta, std::intmax_t value, fmt::format_context& ctx) {
+namespace tremotesf {
+    fmt::format_context::iterator formatQEnum(QMetaEnum meta, std::intmax_t value, fmt::format_context& ctx) {
         return formatQEnumImpl(meta, value, ctx);
     }
 
-    fmt::format_context::iterator formatQEnum(const QMetaEnum& meta, std::uintmax_t value, fmt::format_context& ctx) {
+    fmt::format_context::iterator formatQEnum(QMetaEnum meta, std::uintmax_t value, fmt::format_context& ctx) {
         return formatQEnumImpl(meta, value, ctx);
     }
 }
 
 namespace {
-    fmt::string_view toFmtStringView(const QByteArray& str) { return {str.data(), static_cast<size_t>(str.size())}; }
+    fmt::string_view toFmtStringView(QByteArrayView str) { return {str.data(), static_cast<size_t>(str.size())}; }
 
     fmt::format_context::iterator
     formatSystemError(std::string_view type, const std::system_error& e, fmt::format_context& ctx) {
@@ -73,11 +72,11 @@ namespace fmt {
         return formatter<string_view>::format(toFmtStringView(string.toUtf8()), ctx);
     }
 
-    format_context::iterator formatter<QStringView>::format(const QStringView& string, format_context& ctx) const {
+    format_context::iterator formatter<QStringView>::format(QStringView string, format_context& ctx) const {
         return formatter<string_view>::format(toFmtStringView(string.toUtf8()), ctx);
     }
 
-    format_context::iterator formatter<QLatin1String>::format(const QLatin1String& string, format_context& ctx) const {
+    format_context::iterator formatter<QLatin1String>::format(QLatin1String string, format_context& ctx) const {
         return formatter<string_view>::format(std::string_view(string.data(), static_cast<size_t>(string.size())), ctx);
     }
 
@@ -85,17 +84,17 @@ namespace fmt {
         return formatter<string_view>::format(toFmtStringView(array), ctx);
     }
 
-#if QT_VERSION_MAJOR >= 6
-    format_context::iterator
-    formatter<QUtf8StringView>::format(const QUtf8StringView& string, format_context& ctx) const {
-        return formatter<string_view>::format(string_view(string.data(), static_cast<size_t>(string.size())), ctx);
+    format_context::iterator formatter<QByteArrayView>::format(QByteArrayView array, format_context& ctx) const {
+        return formatter<string_view>::format(toFmtStringView(array), ctx);
     }
 
-    format_context::iterator
-    formatter<QAnyStringView>::format(const QAnyStringView& string, format_context& ctx) const {
+    format_context::iterator formatter<QUtf8StringView>::format(QUtf8StringView string, format_context& ctx) const {
+        return formatter<string_view>::format(toFmtStringView(string), ctx);
+    }
+
+    format_context::iterator formatter<QAnyStringView>::format(QAnyStringView string, format_context& ctx) const {
         return formatter<QString>::format(string.toString(), ctx);
     }
-#endif
 
     format_context::iterator formatter<std::exception>::format(const std::exception& e, format_context& ctx) const {
         const auto type = tremotesf::typeName(e);

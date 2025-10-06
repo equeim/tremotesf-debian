@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -17,6 +17,8 @@
 #include "tremotesf_dbus_generated/org.freedesktop.Notifications.h"
 #include "rpc/servers.h"
 
+using namespace Qt::StringLiterals;
+
 SPECIALIZE_FORMATTER_FOR_QDEBUG(QDBusError)
 
 namespace tremotesf {
@@ -24,6 +26,7 @@ namespace tremotesf {
         constexpr auto flatpakEnvVariable = "FLATPAK_ID";
 
         class PortalNotificationsController final : public NotificationsController {
+            Q_OBJECT
         public:
             explicit PortalNotificationsController(QSystemTrayIcon* trayIcon, const Rpc* rpc, QObject* parent = nullptr)
                 : NotificationsController(trayIcon, rpc, parent) {
@@ -38,27 +41,33 @@ namespace tremotesf {
 
         private:
             Coroutine<> showNotificationViaPortal(QString title, QString message) {
-                info().log("PortalNotificationsController: executing "
-                           "org.freedesktop.portal.Notification.AddNotification() D-Bus call");
+                info().log(
+                    "PortalNotificationsController: executing "
+                    "org.freedesktop.portal.Notification.AddNotification() D-Bus call"
+                );
                 const auto reply = mPortalInterface.AddNotification(
                     QUuid::createUuid().toString(QUuid::WithoutBraces),
                     {
-                        {"title"_l1, title},
-                        {"body"_l1, message},
-                        {"icon"_l1,
-                         QVariant::fromValue(QPair<QString, QDBusVariant>(
-                             "themed"_l1,
-                             QDBusVariant(QStringList{TREMOTESF_APP_ID ""_l1})
-                         ))},
-                        {"default-action"_l1, "app.default"_l1},
+                        {"title"_L1, title},
+                        {"body"_L1, message},
+                        {"icon"_L1,
+                         QVariant::fromValue(
+                             QPair<QString, QDBusVariant>(
+                                 "themed"_L1,
+                                 QDBusVariant(QStringList{TREMOTESF_APP_ID ""_L1})
+                             )
+                         )},
+                        {"default-action"_L1, "app.default"_L1},
                         // We just need to put something here
                         {"default-action-target", true},
                     }
                 );
                 co_await reply;
                 if (!reply.isError()) {
-                    info().log("PortalNotificationsController: executed "
-                               "org.freedesktop.portal.Notification.AddNotification() D-Bus call");
+                    info().log(
+                        "PortalNotificationsController: executed "
+                        "org.freedesktop.portal.Notification.AddNotification() D-Bus call"
+                    );
                     co_return;
                 }
                 warning().log(
@@ -71,12 +80,13 @@ namespace tremotesf {
             }
 
             OrgFreedesktopPortalNotificationInterface mPortalInterface{
-                "org.freedesktop.portal.Desktop"_l1, "/org/freedesktop/portal/desktop"_l1, QDBusConnection::sessionBus()
+                "org.freedesktop.portal.Desktop"_L1, "/org/freedesktop/portal/desktop"_L1, QDBusConnection::sessionBus()
             };
             CoroutineScope mCoroutineScope{};
         };
 
         class LegacyFreedesktopNotificationsController final : public NotificationsController {
+            Q_OBJECT
         public:
             explicit LegacyFreedesktopNotificationsController(
                 QSystemTrayIcon* trayIcon, const Rpc* rpc, QObject* parent = nullptr
@@ -107,24 +117,28 @@ namespace tremotesf {
 
         private:
             Coroutine<> showNotificationViaLegacyInterface(QString title, QString message) {
-                info().log("LegacyFreedesktopNotificationsController: executing org.freedesktop.Notifications.Notify() "
-                           "D-Bus call");
+                info().log(
+                    "LegacyFreedesktopNotificationsController: executing org.freedesktop.Notifications.Notify() "
+                    "D-Bus call"
+                );
                 const auto reply = mLegacyInterface.Notify(
-                    TREMOTESF_APP_NAME ""_l1,
+                    TREMOTESF_APP_NAME ""_L1,
                     0,
-                    TREMOTESF_APP_ID ""_l1,
+                    TREMOTESF_APP_ID ""_L1,
                     title,
                     message,
                     //: Button on notification
-                    {"default"_l1, qApp->translate("tremotesf", "Show Tremotesf")},
-                    {{"desktop-entry"_l1, TREMOTESF_APP_ID ""_l1},
-                     {"x-kde-origin-name"_l1, Servers::instance()->currentServerName()}},
+                    {"default"_L1, qApp->translate("tremotesf", "Show Tremotesf")},
+                    {{"desktop-entry"_L1, TREMOTESF_APP_ID ""_L1},
+                     {"x-kde-origin-name"_L1, Servers::instance()->currentServerName()}},
                     -1
                 );
                 co_await reply;
                 if (!reply.isError()) {
-                    info().log("LegacyFreedesktopNotificationsController: executed "
-                               "org.freedesktop.Notifications.Notify() D-Bus call");
+                    info().log(
+                        "LegacyFreedesktopNotificationsController: executed "
+                        "org.freedesktop.Notifications.Notify() D-Bus call"
+                    );
                     co_return;
                 }
                 warning().log(
@@ -137,7 +151,7 @@ namespace tremotesf {
             }
 
             OrgFreedesktopNotificationsInterface mLegacyInterface{
-                "org.freedesktop.Notifications"_l1, "/org/freedesktop/Notifications"_l1, QDBusConnection::sessionBus()
+                "org.freedesktop.Notifications"_L1, "/org/freedesktop/Notifications"_L1, QDBusConnection::sessionBus()
             };
             std::optional<QByteArray> mActivationToken{};
             CoroutineScope mCoroutineScope{};
@@ -157,3 +171,5 @@ namespace tremotesf {
         return new LegacyFreedesktopNotificationsController(trayIcon, rpc, parent);
     }
 }
+
+#include "notificationscontroller_freedesktop.moc"

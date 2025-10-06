@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -20,7 +20,6 @@
 
 #include "coroutines/coroutines.h"
 #include "fileutils.h"
-#include "literals.h"
 #include "log/log.h"
 #include "requestrouter.h"
 #include "rpc.h"
@@ -28,55 +27,47 @@
 using namespace std::chrono;
 using namespace std::chrono_literals;
 using namespace std::string_literals;
+using namespace Qt::StringLiterals;
 using namespace tremotesf;
 using namespace tremotesf::impl;
-
-#define QFAIL_THROW(message)                                                 \
-    do {                                                                     \
-        QTest::qFail(static_cast<const char*>(message), __FILE__, __LINE__); \
-        throw std::exception();                                              \
-    } while (false)
 
 // NOLINTBEGIN(bugprone-unchecked-optional-access)
 
 namespace {
-    constexpr auto testApiPath = "/"_l1;
+    constexpr auto testApiPath = "/"_L1;
     constexpr auto testTimeout = 5s;
     constexpr auto testRetryAttempts = 0;
 
     const auto contentType = "application/json"s;
+    // Moc can't handle raw string literals lol
+    // https://bugreports.qt.io/browse/QTBUG-55962
+    // NOLINTNEXTLINE(modernize-raw-string-literal)
     const auto successResponse = "{\"result\":\"success\"}"s;
+    // NOLINTNEXTLINE(modernize-raw-string-literal)
     const auto invalidJsonResponse = "{\"result\":\"success}"s;
     const auto sessionIdHeader = "X-Transmission-Session-Id"s;
 
     template<std::derived_from<httplib::Server> Server = httplib::Server>
     class TestHttpServer {
     public:
-        template<typename... Args>
-        explicit TestHttpServer(Args&&... args) : mServer(std::forward<Args>(args)...) {
-            info().log("Server is valid = {}", mServer.is_valid());
-            mServer.set_keep_alive_max_count(1);
-            mServer.set_keep_alive_timeout(1);
-            port = mServer.bind_to_any_port(host.toStdString());
-            info().log("Bound to port {}", port);
-            mServer.Post(testApiPath.data(), [=, this](const httplib::Request& req, httplib::Response& res) {
-                httplib::Server::Handler handler{};
-                {
-                    const std::unique_lock lock(mHandlerMutex);
-                    handler = mHandler;
-                }
-                if (handler) {
-                    handler(req, res);
-                } else {
-                    res.status = 500;
-                }
-            });
+        TestHttpServer()
+            requires std::same_as<Server, httplib::Server>
+        {
+            initServer();
+        }
 
-            mListenFuture = std::async([=, this] {
-                info().log("Starting listening on address {} and port {}", host, port);
-                const bool ok = mServer.listen_after_bind();
-                info().log("Stopped listening, ok = {}", ok);
-            });
+        TestHttpServer(
+            const char* cert_path,
+            const char* private_key_path,
+            const char* client_ca_cert_file_path = nullptr,
+            const char* client_ca_cert_dir_path = nullptr,
+            const char* private_key_password = nullptr
+        )
+            requires std::same_as<Server, httplib::SSLServer>
+            : mServer{
+                  cert_path, private_key_path, client_ca_cert_file_path, client_ca_cert_dir_path, private_key_password
+              } {
+            initServer();
         }
 
         ~TestHttpServer() {
@@ -110,6 +101,32 @@ namespace {
         }
 
     private:
+        void initServer() {
+            info().log("Server is valid = {}", mServer.is_valid());
+            mServer.set_keep_alive_max_count(1);
+            mServer.set_keep_alive_timeout(1);
+            port = mServer.bind_to_any_port(host.toStdString());
+            info().log("Bound to port {}", port);
+            mServer.Post(testApiPath.data(), [=, this](const httplib::Request& req, httplib::Response& res) {
+                httplib::Server::Handler handler{};
+                {
+                    const std::unique_lock lock(mHandlerMutex);
+                    handler = mHandler;
+                }
+                if (handler) {
+                    handler(req, res);
+                } else {
+                    res.status = 500;
+                }
+            });
+
+            mListenFuture = std::async([=, this] {
+                info().log("Starting listening on address {} and port {}", host, port);
+                const bool ok = mServer.listen_after_bind();
+                info().log("Stopped listening, ok = {}", ok);
+            });
+        }
+
         Server mServer{};
         std::future<void> mListenFuture{};
         httplib::Server::Handler mHandler{};
@@ -140,7 +157,7 @@ namespace {
         void init() {
             const int port = mServer.port;
             RequestRouter::RequestsConfiguration config{};
-            config.serverUrl.setScheme("http"_l1);
+            config.serverUrl.setScheme("http"_L1);
             config.serverUrl.setHost(mServer.host);
             config.serverUrl.setPort(port);
             config.serverUrl.setPath(testApiPath);
@@ -156,20 +173,20 @@ namespace {
 
         void checkUrlIsCorrect() {
             mServer.handle([&](const httplib::Request&, httplib::Response& res) { success(res); });
-            const auto response = waitForResponse("foo"_l1, QByteArray{});
+            const auto response = waitForResponse("foo"_L1, QByteArray{});
             QCOMPARE(response.has_value(), true);
             QCOMPARE(response->arguments, QJsonObject{});
             QCOMPARE(response->success, true);
         }
 
         void checkThatJsonIsFormedCorrectly() {
-            const auto method = "foo"_l1;
+            const auto method = "foo"_L1;
             const QJsonObject arguments{{"bar", "foobar"}};
 
             mServer.handle([&](const httplib::Request& req, httplib::Response& res) {
                 const auto json = QJsonDocument::fromJson(req.body.c_str());
                 const auto expectedJson =
-                    QJsonDocument(QJsonObject{{"method"_l1, method}, {"arguments"_l1, arguments}});
+                    QJsonDocument(QJsonObject{{u"method"_s, method}, {u"arguments"_s, arguments}});
                 if (json == expectedJson) {
                     success(res);
                 } else {
@@ -192,7 +209,7 @@ namespace {
                 mRouter.setConfiguration(std::move(config));
             }
 
-            const auto error = waitForError("foo"_l1, QByteArray{});
+            const auto error = waitForError("foo"_L1, QByteArray{});
             QCOMPARE(error.has_value(), true);
             QCOMPARE(error.value(), RpcError::TimedOut);
         }
@@ -204,7 +221,7 @@ namespace {
                 config.serverUrl.setPort(9);
                 mRouter.setConfiguration(std::move(config));
             }
-            const auto error = waitForError("foo"_l1, QByteArray{});
+            const auto error = waitForError("foo"_L1, QByteArray{});
             QCOMPARE(error.has_value(), true);
             if (error.value() == RpcError::TimedOut) {
                 // This is not what we test here but it can happen on some systems
@@ -225,7 +242,7 @@ namespace {
                 config.serverUrl.setPort(tcpServer.serverPort());
                 mRouter.setConfiguration(std::move(config));
             }
-            const auto error = waitForError("foo"_l1, QByteArray{});
+            const auto error = waitForError("foo"_L1, QByteArray{});
             QCOMPARE(error.has_value(), true);
             QCOMPARE(error.value(), RpcError::ConnectionError);
         }
@@ -242,7 +259,7 @@ namespace {
                 config.retryAttempts = retryAttempts;
                 mRouter.setConfiguration(std::move(config));
             }
-            const auto error = waitForError("foo"_l1, QByteArray{});
+            const auto error = waitForError("foo"_L1, QByteArray{});
             QCOMPARE(error.has_value(), true);
             QCOMPARE(error.value(), RpcError::ConnectionError);
             QCOMPARE(requestsCount.load(), retryAttempts + 1);
@@ -251,74 +268,183 @@ namespace {
 #ifdef CPPHTTPLIB_OPENSSL_SUPPORT
         void checkSelfSignedCertificateError() {
             TestHttpServer<httplib::SSLServer> server(
-                TEST_DATA_PATH "/root-certificate.pem",
-                TEST_DATA_PATH "/root-certificate-key.pem"
+                TEST_DATA_PATH "/server-certs/self-signed.pem",
+                TEST_DATA_PATH "/server-certs/self-signed-key.pem"
             );
             server.handle([&](const httplib::Request&, httplib::Response& res) { success(res); });
             {
                 RequestRouter::RequestsConfiguration config = mRouter.configuration().value();
-                config.serverUrl.setScheme("https"_l1);
+                config.serverUrl.setScheme("https"_L1);
                 config.serverUrl.setPort(server.port);
                 mRouter.setConfiguration(std::move(config));
             }
-            const auto error = waitForError("foo"_l1, QByteArray{});
+            const auto error = waitForError("foo"_L1, QByteArray{});
             QCOMPARE(error.has_value(), true);
             QCOMPARE(error.value(), RpcError::ConnectionError);
         }
 
         void checkSelfSignedCertificateSuccess() {
             TestHttpServer<httplib::SSLServer> server(
-                TEST_DATA_PATH "/root-certificate.pem",
-                TEST_DATA_PATH "/root-certificate-key.pem"
+                TEST_DATA_PATH "/server-certs/self-signed.pem",
+                TEST_DATA_PATH "/server-certs/self-signed-key.pem"
             );
             server.handle([&](const httplib::Request&, httplib::Response& res) { success(res); });
             {
                 RequestRouter::RequestsConfiguration config = mRouter.configuration().value();
-                config.serverUrl.setScheme("https"_l1);
+                config.serverUrl.setScheme("https"_L1);
                 config.serverUrl.setPort(server.port);
-                config.serverCertificateChain =
-                    QSslCertificate::fromPath(TEST_DATA_PATH "/root-certificate.pem", QSsl::Pem);
+                config.serverCertificate = RequestRouter::RequestsConfiguration::SelfSignedCertificate(
+                    QSslCertificate::fromPath(TEST_DATA_PATH "/server-certs/self-signed.pem", QSsl::Pem).first()
+                );
                 mRouter.setConfiguration(std::move(config));
             }
-            const auto response = waitForResponse("foo"_l1, QByteArray{});
+            const auto response = waitForResponse("foo"_L1, QByteArray{});
             QCOMPARE(response.has_value(), true);
             QCOMPARE(response->success, true);
         }
 
-        void checkSelfSignedCertificateChainSuccess() {
+        void checkCertificateSignedWithCustomRootSuccess() {
+            // Server returns signed certificate with its (self-signed) root
             TestHttpServer<httplib::SSLServer> server(
-                TEST_DATA_PATH "/chain.pem",
-                TEST_DATA_PATH "/signed-certificate-key.pem"
+                TEST_DATA_PATH "/server-certs/signed-with-custom-root/without-intermediate/leaf.pem",
+                TEST_DATA_PATH "/server-certs/signed-with-custom-root/without-intermediate/leaf-key.pem"
             );
             server.handle([&](const httplib::Request&, httplib::Response& res) { success(res); });
             {
                 RequestRouter::RequestsConfiguration config = mRouter.configuration().value();
-                config.serverUrl.setScheme("https"_l1);
+                config.serverUrl.setScheme("https"_L1);
                 config.serverUrl.setPort(server.port);
-                config.serverCertificateChain = QSslCertificate::fromPath(TEST_DATA_PATH "/chain.pem", QSsl::Pem);
+                config.serverCertificate = RequestRouter::RequestsConfiguration::CustomRoot{
+                    .rootCertificate = QSslCertificate::fromPath(
+                                           TEST_DATA_PATH "/server-certs/signed-with-custom-root/root.pem",
+                                           QSsl::Pem
+                    )
+                                           .first(),
+                    .leafCertificate =
+                        QSslCertificate::fromPath(
+                            TEST_DATA_PATH "/server-certs/signed-with-custom-root/without-intermediate/leaf.pem",
+                            QSsl::Pem
+                        )
+                            .first()
+                };
                 mRouter.setConfiguration(std::move(config));
             }
-            const auto response = waitForResponse("foo"_l1, QByteArray{});
+            const auto response = waitForResponse("foo"_L1, QByteArray{});
+            QCOMPARE(response.has_value(), true);
+            QCOMPARE(response->success, true);
+        }
+
+        void checkCertificateSignedWithCustomRootAndServerReturnsWholeChainSuccess() {
+            // Server returns signed certificate with its (self-signed) root
+            TestHttpServer<httplib::SSLServer> server(
+                TEST_DATA_PATH "/server-certs/signed-with-custom-root/without-intermediate/leaf-with-root.pem",
+                TEST_DATA_PATH "/server-certs/signed-with-custom-root/without-intermediate/leaf-key.pem"
+            );
+            server.handle([&](const httplib::Request&, httplib::Response& res) { success(res); });
+            {
+                RequestRouter::RequestsConfiguration config = mRouter.configuration().value();
+                config.serverUrl.setScheme("https"_L1);
+                config.serverUrl.setPort(server.port);
+                config.serverCertificate = RequestRouter::RequestsConfiguration::CustomRoot{
+                    .rootCertificate = QSslCertificate::fromPath(
+                                           TEST_DATA_PATH "/server-certs/signed-with-custom-root/root.pem",
+                                           QSsl::Pem
+                    )
+                                           .first(),
+                    .leafCertificate =
+                        QSslCertificate::fromPath(
+                            TEST_DATA_PATH "/server-certs/signed-with-custom-root/without-intermediate/leaf.pem",
+                            QSsl::Pem
+                        )
+                            .first()
+                };
+                mRouter.setConfiguration(std::move(config));
+            }
+            const auto response = waitForResponse("foo"_L1, QByteArray{});
+            QCOMPARE(response.has_value(), true);
+            QCOMPARE(response->success, true);
+        }
+
+        void checkCertificateSignedWithCustomRootAndIntermediateSuccess() {
+            // Server returns signed certificate with its (self-signed) root
+            TestHttpServer<httplib::SSLServer> server(
+                TEST_DATA_PATH "/server-certs/signed-with-custom-root/with-intermediate/leaf-with-intermediate.pem",
+                TEST_DATA_PATH "/server-certs/signed-with-custom-root/with-intermediate/leaf-key.pem"
+            );
+            server.handle([&](const httplib::Request&, httplib::Response& res) { success(res); });
+            {
+                RequestRouter::RequestsConfiguration config = mRouter.configuration().value();
+                config.serverUrl.setScheme("https"_L1);
+                config.serverUrl.setPort(server.port);
+                config.serverCertificate = RequestRouter::RequestsConfiguration::CustomRoot{
+                    .rootCertificate = QSslCertificate::fromPath(
+                                           TEST_DATA_PATH "/server-certs/signed-with-custom-root/root.pem",
+                                           QSsl::Pem
+                    )
+                                           .first(),
+                    .leafCertificate =
+                        QSslCertificate::fromPath(
+                            TEST_DATA_PATH "/server-certs/signed-with-custom-root/with-intermediate/leaf.pem",
+                            QSsl::Pem
+                        )
+                            .first()
+                };
+                mRouter.setConfiguration(std::move(config));
+            }
+            const auto response = waitForResponse("foo"_L1, QByteArray{});
+            QCOMPARE(response.has_value(), true);
+            QCOMPARE(response->success, true);
+        }
+
+        void checkCertificateSignedWithCustomRootAndIntermediateAndServerReturnsWholeChainSuccess() {
+            // Server returns signed certificate with its (self-signed) root
+            TestHttpServer<httplib::SSLServer> server(
+                TEST_DATA_PATH
+                "/server-certs/signed-with-custom-root/with-intermediate/leaf-with-intermediate-and-root.pem",
+                TEST_DATA_PATH "/server-certs/signed-with-custom-root/with-intermediate/leaf-key.pem"
+            );
+            server.handle([&](const httplib::Request&, httplib::Response& res) { success(res); });
+            {
+                RequestRouter::RequestsConfiguration config = mRouter.configuration().value();
+                config.serverUrl.setScheme("https"_L1);
+                config.serverUrl.setPort(server.port);
+                config.serverCertificate = RequestRouter::RequestsConfiguration::CustomRoot{
+                    .rootCertificate = QSslCertificate::fromPath(
+                                           TEST_DATA_PATH "/server-certs/signed-with-custom-root/root.pem",
+                                           QSsl::Pem
+                    )
+                                           .first(),
+                    .leafCertificate =
+                        QSslCertificate::fromPath(
+                            TEST_DATA_PATH "/server-certs/signed-with-custom-root/with-intermediate/leaf.pem",
+                            QSsl::Pem
+                        )
+                            .first()
+                };
+                mRouter.setConfiguration(std::move(config));
+            }
+            const auto response = waitForResponse("foo"_L1, QByteArray{});
             QCOMPARE(response.has_value(), true);
             QCOMPARE(response->success, true);
         }
 
         void checkClientCertificateError() {
             TestHttpServer<httplib::SSLServer> server(
-                TEST_DATA_PATH "/root-certificate.pem",
-                TEST_DATA_PATH "/root-certificate-key.pem",
-                TEST_DATA_PATH "/client-certificate-and-key.pem"
+                TEST_DATA_PATH "/server-certs/self-signed.pem",
+                TEST_DATA_PATH "/server-certs/self-signed-key.pem",
+                TEST_DATA_PATH "/client-certs/client-certificate-and-key.pem"
             );
             server.handle([&](const httplib::Request&, httplib::Response& res) { success(res); });
             {
                 RequestRouter::RequestsConfiguration config = mRouter.configuration().value();
-                config.serverUrl.setScheme("https"_l1);
+                config.serverUrl.setScheme("https"_L1);
                 config.serverUrl.setPort(server.port);
-                config.serverCertificateChain =
-                    QSslCertificate::fromPath(TEST_DATA_PATH "/root-certificate.pem", QSsl::Pem);
+                config.serverCertificate = RequestRouter::RequestsConfiguration::SelfSignedCertificate(
+                    QSslCertificate::fromPath(TEST_DATA_PATH "/server-certs/self-signed.pem", QSsl::Pem).first()
+                );
                 mRouter.setConfiguration(std::move(config));
             }
-            const auto error = waitForError("foo"_l1, QByteArray{});
+            const auto error = waitForError("foo"_L1, QByteArray{});
             QCOMPARE(error.has_value(), true);
             if (error.value() == RpcError::TimedOut) {
                 // Can happen with TLS 1.3
@@ -330,27 +456,29 @@ namespace {
 
         void checkClientCertificateSuccess() {
             TestHttpServer<httplib::SSLServer> server(
-                TEST_DATA_PATH "/root-certificate.pem",
-                TEST_DATA_PATH "/root-certificate-key.pem",
-                TEST_DATA_PATH "/client-certificate-and-key.pem"
+                TEST_DATA_PATH "/server-certs/self-signed.pem",
+                TEST_DATA_PATH "/server-certs/self-signed-key.pem",
+                TEST_DATA_PATH "/client-certs/client-certificate-and-key.pem"
             );
             server.handle([&](const httplib::Request&, httplib::Response& res) { success(res); });
             {
                 RequestRouter::RequestsConfiguration config = mRouter.configuration().value();
-                config.serverUrl.setScheme("https"_l1);
+                config.serverUrl.setScheme("https"_L1);
                 config.serverUrl.setPort(server.port);
-                config.serverCertificateChain =
-                    QSslCertificate::fromPath(TEST_DATA_PATH "/root-certificate.pem", QSsl::Pem);
+                config.serverCertificate = RequestRouter::RequestsConfiguration::SelfSignedCertificate(
+                    QSslCertificate::fromPath(TEST_DATA_PATH "/server-certs/self-signed.pem", QSsl::Pem).first()
+                );
                 config.clientCertificate =
-                    QSslCertificate::fromPath(TEST_DATA_PATH "/client-certificate-and-key.pem", QSsl::Pem).first();
+                    QSslCertificate::fromPath(TEST_DATA_PATH "/client-certs/client-certificate-and-key.pem", QSsl::Pem)
+                        .first();
                 {
-                    QFile file(TEST_DATA_PATH "/client-certificate-and-key.pem");
+                    QFile file(TEST_DATA_PATH "/client-certs/client-certificate-and-key.pem");
                     openFile(file, QIODevice::ReadOnly);
                     config.clientPrivateKey = QSslKey(&file, QSsl::Rsa);
                 }
                 mRouter.setConfiguration(std::move(config));
             }
-            const auto response = waitForResponse("foo"_l1, QByteArray{});
+            const auto response = waitForResponse("foo"_L1, QByteArray{});
             QCOMPARE(response.has_value(), true);
             QCOMPARE(response->success, true);
         }
@@ -360,14 +488,14 @@ namespace {
             mServer.handle([&](const httplib::Request&, httplib::Response& res) {
                 res.set_content(invalidJsonResponse, contentType);
             });
-            const auto error = waitForError("foo"_l1, QByteArray{});
+            const auto error = waitForError("foo"_L1, QByteArray{});
             QCOMPARE(error.has_value(), true);
             QCOMPARE(error.value(), RpcError::ParseError);
         }
 
         void checkConflictErrorWithoutSessionIdIsHandled() {
             mServer.handle([&](const httplib::Request&, httplib::Response& res) { res.status = 409; });
-            const auto error = waitForError("foo"_l1, QByteArray{});
+            const auto error = waitForError("foo"_L1, QByteArray{});
             QCOMPARE(error.has_value(), true);
             QCOMPARE(error.value(), RpcError::ConnectionError);
         }
@@ -378,7 +506,7 @@ namespace {
                 res.status = 409;
                 res.set_header(sessionIdHeader, sessionIdValue);
             });
-            const auto error = waitForError("foo"_l1, QByteArray{});
+            const auto error = waitForError("foo"_L1, QByteArray{});
             QCOMPARE(error.has_value(), true);
             QCOMPARE(error.value(), RpcError::ConnectionError);
         }
@@ -393,7 +521,7 @@ namespace {
                 }
                 res.set_header(sessionIdHeader, sessionIdValue);
             });
-            const auto response = waitForResponse("foo"_l1, QByteArray{});
+            const auto response = waitForResponse("foo"_L1, QByteArray{});
             QCOMPARE(response.has_value(), true);
             QCOMPARE(response->arguments, QJsonObject{});
             QCOMPARE(response->success, true);
@@ -409,21 +537,21 @@ namespace {
                 }
                 res.set_header(sessionIdHeader, sessionIdValue);
             });
-            auto response = waitForResponse("foo"_l1, QByteArray{});
+            auto response = waitForResponse("foo"_L1, QByteArray{});
             QCOMPARE(response.has_value(), true);
             QCOMPARE(response->arguments, QJsonObject{});
             QCOMPARE(response->success, true);
 
             sessionIdValue = "session id 2";
-            response = waitForResponse("foo"_l1, QByteArray{});
+            response = waitForResponse("foo"_L1, QByteArray{});
             QCOMPARE(response.has_value(), true);
             QCOMPARE(response->arguments, QJsonObject{});
             QCOMPARE(response->success, true);
         }
 
         void checkThatAuthenticationWorks() {
-            const QString user = "foo"_l1;
-            const QString password = "bar"_l1;
+            const QString user = "foo"_L1;
+            const QString password = "bar"_L1;
             const auto header = httplib::make_basic_authentication_header(user.toStdString(), password.toStdString());
             mServer.handle([&](const httplib::Request& req, httplib::Response& res) {
                 checkAuthentication(req, res, user.toStdString(), password.toStdString());
@@ -435,7 +563,7 @@ namespace {
                 config.password = password;
                 mRouter.setConfiguration(std::move(config));
             }
-            const auto response = waitForResponse("foo"_l1, QByteArray{});
+            const auto response = waitForResponse("foo"_L1, QByteArray{});
             QCOMPARE(response.has_value(), true);
             QCOMPARE(response->arguments, QJsonObject{});
             QCOMPARE(response->success, true);
@@ -445,7 +573,7 @@ namespace {
             mServer.handle([&](const httplib::Request& req, httplib::Response& res) {
                 checkAuthentication(req, res, "foo", "bar");
             });
-            const auto error = waitForError("foo"_l1, QByteArray{});
+            const auto error = waitForError("foo"_L1, QByteArray{});
             QCOMPARE(error.has_value(), true);
             QCOMPARE(error.value(), RpcError::AuthenticationError);
         }
@@ -463,7 +591,7 @@ namespace {
             CoroutineScope scope{};
             const auto connection = connectToErrorSignal(responseOrError, scope);
             const auto connectionGuard = QScopeGuard([=] { QObject::disconnect(connection); });
-            scope.launch(waitForResponseCoroutine(mRouter.postRequest("foo"_l1, QByteArray{}), responseOrError));
+            scope.launch(waitForResponseCoroutine(mRouter.postRequest("foo"_L1, QByteArray{}), responseOrError));
 
             QTest::qWait(100);
             mRouter.abortNetworkRequestsAndClearSessionId();
@@ -489,6 +617,7 @@ namespace {
     private:
         Coroutine<> waitForResponseCoroutine(
             Coroutine<RequestRouter::Response> requestCoroutine,
+            // NOLINTNEXTLINE(cppcoreguidelines-avoid-reference-coroutine-parameters)
             std::variant<RequestRouter::Response, RpcError, std::monostate>& responseOrError
         ) {
             responseOrError = co_await requestCoroutine;

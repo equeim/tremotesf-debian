@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -10,6 +10,7 @@
 #include "tracker.h"
 #include "torrent.h"
 
+using namespace Qt::StringLiterals;
 using namespace tremotesf::impl;
 
 class TrackerTest final : public QObject {
@@ -29,7 +30,7 @@ private slots:
         for (const auto& ip : ips) {
             const QHostAddress expectedIp(ip);
             QUrl url{};
-            url.setScheme("https");
+            url.setScheme("https"_L1);
             if (expectedIp.protocol() == QAbstractSocket::IPv6Protocol) {
                 url.setHost(fmt::format("[{}]", ip).c_str());
             } else {

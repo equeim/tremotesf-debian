@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -58,13 +58,13 @@ namespace tremotesf {
                 fmt::format_to(std::back_insert_iterator(out), "\nCaused by: unknown exception");
             }
         }
-    }
 
-    template<impl::IsException E>
-    std::string formatExceptionRecursivelyImpl(const E& e) {
-        std::string out = fmt::format(impl::singleArgumentFormatString, e);
-        appendNestedExceptions(out, e);
-        return out;
+        template<impl::IsException E>
+        std::string formatExceptionRecursivelyImpl(const E& e) {
+            std::string out = fmt::format(singleArgumentFormatString, e);
+            appendNestedExceptions(out, e);
+            return out;
+        }
     }
 
     std::string formatExceptionRecursively(const std::exception& e) { return formatExceptionRecursivelyImpl(e); }

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -7,16 +7,13 @@
 
 #include <concepts>
 #include <coroutine>
+#include <exception>
 #include <functional>
 #include <optional>
 #include <variant>
 #include <utility>
 
-#if __has_include(<QtClassHelperMacros>)
-#    include <QtClassHelperMacros>
-#else
-#    include <QtGlobal>
-#endif
+#include <QtClassHelperMacros>
 
 #include "coroutinefwd.h"
 
@@ -105,7 +102,7 @@ namespace tremotesf {
         class CoroutinePromiseFinalSuspendAwaiter final {
         public:
             explicit CoroutinePromiseFinalSuspendAwaiter(std::coroutine_handle<> parentCoroutine)
-                : mParentCoroutine(std::move(parentCoroutine)) {}
+                : mParentCoroutine(parentCoroutine) {}
 
             // If there is no parent coroutine then await_ready returns false which causes our coroutine to be destroyed
             // Otherwise control is transferred to parent coroutine, which destroys CoroutineAwaiter and therefore our coroutine
@@ -190,7 +187,8 @@ namespace tremotesf {
                         })) {
                         return std::noop_coroutine();
                     }
-                    mHandle.promise().setOwningStandaloneCoroutine(mParentCoroutinePromise->owningStandaloneCoroutine()
+                    mHandle.promise().setOwningStandaloneCoroutine(
+                        mParentCoroutinePromise->owningStandaloneCoroutine()
                     );
                 }
                 mHandle.promise().setParentCoroutineHandle(parentCoroutineHandle);
@@ -255,14 +253,14 @@ namespace tremotesf {
             bool completeCancellation();
 
             void invokeCompletionCallback(
-                std::exception_ptr&& unhandledException, bool coroutineWillBeDestroyedAutomatically
+                const std::exception_ptr& unhandledException, bool coroutineWillBeDestroyedAutomatically
             );
-            void setCompletionCallback(std::function<void(std::exception_ptr)>&& callback);
+            void setCompletionCallback(std::function<void(const std::exception_ptr&)>&& callback);
 
         private:
             Coroutine<void> mCoroutine;
             StandaloneCoroutine* mRootCoroutine{};
-            std::function<void(std::exception_ptr)> mCompletionCallback{};
+            std::function<void(const std::exception_ptr&)> mCompletionCallback{};
             enum class CancellationState : char { NotCancelled, Cancelling, Cancelled };
             CancellationState mCancellationState{CancellationState::NotCancelled};
         };

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -15,10 +15,11 @@
 
 #include <fmt/format.h>
 
-#include "literals.h"
 #include "macoshelpers.h"
 #include "target_os.h"
 #include "log/log.h"
+
+using namespace Qt::StringLiterals;
 
 namespace fmt {
     template<>
@@ -61,11 +62,7 @@ namespace fmt {
                 return std::string_view{};
             }();
             if (string.empty()) {
-                return fmt::format_to(
-                    ctx.out(),
-                    "QFileDevice::FileError::<unnamed value {}>",
-                    static_cast<std::underlying_type_t<decltype(e)>>(e)
-                );
+                return fmt::format_to(ctx.out(), "QFileDevice::FileError::<unnamed value {}>", std::to_underlying(e));
             }
             return fmt::format_to(ctx.out(), "QFileDevice::FileError::{}", string);
         }
@@ -194,7 +191,8 @@ namespace tremotesf {
             const qint64 bytesWritten = file.write(remainingData.data(), static_cast<qint64>(remainingData.size()));
             if (bytesWritten == -1) {
                 // Error, throw
-                throw QFileError(fmt::format("Failed to write to {}: {}", fileDescription(file), errorDescription(file))
+                throw QFileError(
+                    fmt::format("Failed to write to {}: {}", fileDescription(file), errorDescription(file))
                 );
             }
             if (bytesWritten == static_cast<qint64>(remainingData.size())) {
@@ -293,14 +291,14 @@ namespace tremotesf {
 
             constexpr QLatin1String sessionIdFilePrefix = [] {
                 if constexpr (targetOs == TargetOs::Windows) {
-                    return "Transmission/tr_session_id_"_l1;
+                    return "Transmission/tr_session_id_"_L1;
                 } else {
-                    return "tr_session_id_"_l1;
+                    return "tr_session_id_"_L1;
                 }
             }();
         }
 
-        bool isTransmissionSessionIdFileExists(const QByteArray& sessionId) {
+        bool isTransmissionSessionIdFileExists(QByteArrayView sessionId) {
             const auto file = QStandardPaths::locate(sessionIdFileLocation, sessionIdFilePrefix % sessionId);
             if (!file.isEmpty()) {
                 info().log(

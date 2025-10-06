@@ -1,18 +1,8 @@
-# SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+# SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 #
 # SPDX-License-Identifier: CC0-1.0
 
-if (NOT DEFINED TREMOTESF_QT6)
-    message(FATAL_ERROR "TREMOTESF_QT6 is not defined")
-endif()
-
-if (TREMOTESF_QT6)
-    set(TREMOTESF_QT_VERSION_MAJOR 6)
-    set(TREMOTESF_MINIMUM_QT_VERSION 6.6.0)
-else()
-    set(TREMOTESF_QT_VERSION_MAJOR 5)
-    set(TREMOTESF_MINIMUM_QT_VERSION 5.15.0)
-endif()
+set(TREMOTESF_MINIMUM_QT_VERSION 6.8.0)
 
 if (UNIX AND NOT APPLE)
     set(TREMOTESF_UNIX_FREEDESKTOP ON)
@@ -103,16 +93,6 @@ macro(check_if_stdlib_is_libcpp)
     check_cxx_symbol_exists("_LIBCPP_VERSION" "version" TREMOTESF_STDLIB_IS_LIBCPP)
 endmacro()
 
-macro(check_if_libcpp_18_or_newer)
-    include(CheckCXXSourceCompiles)
-    set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
-    # Can't use CMAKE_CXX_COMPILER_VERSION here because it may not correspond to the actual version of libc++ (e.g. with Apple Clang)
-    check_cxx_source_compiles([=[
-        #include <version>
-        static_assert(_LIBCPP_VERSION >= 180000);
-    ]=] TREMOTESF_LIBCPP_IS_18_OR_NEWER)
-endmacro()
-
 macro(apply_hardening_options common_compile_options_var common_compile_definitions_var)
     if (NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC") # Not Microsofts's cl.exe, but allowing LLVM's clang-cl.exe on Windows
         include(CheckCXXCompilerFlag)
@@ -162,10 +142,7 @@ macro(apply_hardening_options common_compile_options_var common_compile_definiti
             else()
                 check_if_stdlib_is_libcpp()
                 if (TREMOTESF_STDLIB_IS_LIBCPP)
-                    check_if_libcpp_18_or_newer()
-                    if (TREMOTESF_LIBCPP_IS_18_OR_NEWER)
-                        list(APPEND "${common_compile_definitions_var}" _LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_FAST)
-                    endif()
+                    list(APPEND "${common_compile_definitions_var}" _LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_FAST)
                 else()
                     message(WARNING "Unknown C++ standard library implementation")
                 endif()
@@ -195,30 +172,13 @@ macro(apply_asan_options common_compile_options_var common_compile_definitions_v
     endif()
 endmacro()
 
-# Needed for std::views::join
-macro(apply_old_libcpp_workaround common_compile_options_var)
-    if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT MSVC)
-        check_if_stdlib_is_libcpp()
-        if (TREMOTESF_STDLIB_IS_LIBCPP)
-            check_if_libcpp_18_or_newer()
-            if (NOT TREMOTESF_LIBCPP_IS_18_OR_NEWER)
-                list(APPEND "${common_compile_options_var}" -fexperimental-library)
-            endif()
-        endif()
-    endif()
-endmacro()
-
 function(append_qt_disable_deprecated_macro common_compile_definitions_var)
     string(REPLACE "." ";" min_qt_version_components "${TREMOTESF_MINIMUM_QT_VERSION}")
     list(GET min_qt_version_components 0 major)
     list(GET min_qt_version_components 1 minor)
     list(GET min_qt_version_components 2 patch)
     math(EXPR macro_value "(${major}<<16)|(${minor}<<8)|(${patch})" OUTPUT_FORMAT HEXADECIMAL)
-    if (TREMOTESF_QT6)
-        list(APPEND "${common_compile_definitions_var}" "QT_DISABLE_DEPRECATED_UP_TO=${macro_value}")
-    else()
-        list(APPEND "${common_compile_definitions_var}" "QT_DISABLE_DEPRECATED_BEFORE=${macro_value}")
-    endif()
+    list(APPEND "${common_compile_definitions_var}" "QT_DISABLE_DEPRECATED_UP_TO=${macro_value}")
     return(PROPAGATE "${common_compile_definitions_var}")
 endfunction()
 
@@ -253,7 +213,6 @@ function(set_common_options_on_targets)
     if (TREMOTESF_ASAN)
         apply_asan_options(common_compile_options common_compile_definitions common_link_options)
     endif()
-    apply_old_libcpp_workaround(common_compile_options)
 
     list(
         APPEND common_compile_definitions
@@ -284,7 +243,7 @@ function(set_common_options_on_targets)
         list(APPEND common_compile_definitions TREMOTESF_UNIX_FREEDESKTOP)
     endif()
 
-    set(common_public_compile_features cxx_std_20)
+    set(common_public_compile_features cxx_std_23)
     set(common_target_properties CXX_EXTENSIONS OFF CXX_SCAN_FOR_MODULES OFF)
 
     get_directory_property(targets BUILDSYSTEM_TARGETS)

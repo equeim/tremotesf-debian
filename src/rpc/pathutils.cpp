@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -6,7 +6,8 @@
 #include <QRegularExpression>
 
 #include "pathutils.h"
-#include "literals.h"
+
+using namespace Qt::StringLiterals;
 
 namespace tremotesf {
     // We can't use QDir::to/fromNativeSeparators because it checks for current OS,
@@ -15,22 +16,13 @@ namespace tremotesf {
     namespace {
         constexpr auto windowsSeparatorChar = '\\';
         constexpr auto unixSeparatorChar = '/';
-        constexpr auto unixSeparatorString = "/"_l1;
+        constexpr auto unixSeparatorString = "/"_L1;
 
         enum class PathType { Unix, WindowsAbsoluteDOSFilePath, WindowsUNCOrDOSDevicePath };
 
-        QRegularExpressionMatch regexMatch(const QRegularExpression& regex, QStringView subjectView) {
-            return regex
-#if QT_VERSION_MAJOR >= 6
-                .matchView(subjectView);
-#else
-                .match(subjectView);
-#endif
-        }
-
         bool isWindowsUNCOrDOSDevicePath(QStringView path) {
-            static const QRegularExpression regex(R"(^(?:\\|//).*$)"_l1);
-            return regexMatch(regex, path).hasMatch();
+            static const QRegularExpression regex(R"(^(?:\\|//).*$)"_L1);
+            return regex.matchView(path).hasMatch();
         }
 
         PathType determinePathType(QStringView path, PathOs pathOs) {
@@ -68,10 +60,10 @@ namespace tremotesf {
             const auto& regex = [pathType]() -> const QRegularExpression& {
                 if (pathType == PathType::WindowsUNCOrDOSDevicePath) {
                     // Don't collapse leading '//'
-                    static const QRegularExpression regex(R"((?!^)//+)"_l1);
+                    static const QRegularExpression regex(R"((?!^)//+)"_L1);
                     return regex;
                 }
-                static const QRegularExpression regex(R"(//+)"_l1);
+                static const QRegularExpression regex(R"(//+)"_L1);
                 return regex;
             }();
             path.replace(regex, unixSeparatorString);
@@ -102,8 +94,8 @@ namespace tremotesf {
     }
 
     bool isAbsoluteWindowsDOSFilePath(QStringView path) {
-        static const QRegularExpression regex(R"(^[A-Za-z]:[\\/]?.*$)"_l1);
-        return regexMatch(regex, path).hasMatch();
+        static const QRegularExpression regex(R"(^[A-Za-z]:[\\/]?.*$)"_L1);
+        return regex.matchView(path).hasMatch();
     }
 
     QString normalizePath(const QString& path, PathOs pathOs) {
@@ -142,11 +134,7 @@ namespace tremotesf {
         if (index == -1 || index == (path.size() - 1)) {
             return path;
         }
-#if QT_VERSION_MAJOR >= 6
         return path.sliced(index + 1);
-#else
-        return path.mid(index + 1);
-#endif
     }
 
 }

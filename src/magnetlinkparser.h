@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -9,12 +9,11 @@
 #include <vector>
 
 #include "log/formatters.h"
-#include "literals.h"
 
 class QUrl;
 
 namespace tremotesf {
-    inline constexpr auto magnetScheme = "magnet"_l1;
+    inline constexpr auto magnetScheme = QLatin1String("magnet");
 
     struct TorrentMagnetLink {
         QString infoHashV1;

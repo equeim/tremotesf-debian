@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -10,13 +10,14 @@
 #include <fmt/ranges.h>
 
 #include "magnetlinkparser.h"
-#include "stdutils.h"
+
+using namespace Qt::StringLiterals;
 
 namespace tremotesf {
     namespace {
-        constexpr auto xtKey = "xt"_l1;
-        constexpr auto xtValuePrefix = "urn:btih:"_l1;
-        constexpr auto trKey = "tr"_l1;
+        constexpr auto xtKey = "xt"_L1;
+        constexpr auto xtValuePrefix = "urn:btih:"_L1;
+        constexpr auto trKey = "tr"_L1;
     }
 
     TorrentMagnetLink parseMagnetLink(const QUrl& url) {
@@ -34,17 +35,16 @@ namespace tremotesf {
         }
         auto infoHashV1 = infoHashV1Value->mid(xtValuePrefix.size()).toLower();
 
-        auto trackers = toContainer<std::vector>(
-            query.allQueryItemValues(trKey, QUrl::FullyDecoded) |
-            std::views::transform([](auto tracker) { return std::set{tracker}; })
-        );
+        auto trackers = query.allQueryItemValues(trKey, QUrl::FullyDecoded)
+                        | std::views::transform([](auto tracker) { return std::set{std::move(tracker)}; })
+                        | std::ranges::to<std::vector>();
 
         return {.infoHashV1 = std::move(infoHashV1), .trackers = std::move(trackers)};
     }
 
     QDebug operator<<(QDebug debug, const TorrentMagnetLink& magnetLink) {
         const QDebugStateSaver saver(debug);
-        debug.noquote() << fmt::format(impl::singleArgumentFormatString, magnetLink).c_str();
+        debug.noquote() << fmt::format(singleArgumentFormatString, magnetLink).c_str();
         return debug;
     }
 

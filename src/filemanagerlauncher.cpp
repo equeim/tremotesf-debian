@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -14,9 +14,10 @@
 #include <QUrl>
 
 #include "log/log.h"
-#include "literals.h"
 
 SPECIALIZE_FORMATTER_FOR_QDEBUG(QUrl)
+
+using namespace Qt::StringLiterals;
 
 namespace tremotesf {
     namespace impl {
@@ -27,7 +28,7 @@ namespace tremotesf {
             for (const QString& filePath : files) {
                 QString dirPath = QFileInfo(filePath).path();
 
-                if (std::ranges::find(nonExistentDirectories, dirPath) != nonExistentDirectories.end()) {
+                if (std::ranges::contains(nonExistentDirectories, dirPath)) {
                     continue;
                 }
                 if (!QFileInfo::exists(dirPath)) {
@@ -92,7 +93,7 @@ namespace tremotesf {
                 parentWidget
             );
             if (error.has_value()) {
-                dialog->setText(dialog->text() % "\n\n"_l1 % *error);
+                dialog->setText(dialog->text() % "\n\n"_L1 % *error);
             }
             dialog->setAttribute(Qt::WA_DeleteOnClose);
             dialog->show();

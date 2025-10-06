@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -44,7 +44,8 @@ namespace tremotesf {
 
         private:
             void awaitSuspendImpl();
-            void onCoroutineCompleted(impl::StandaloneCoroutine* coroutine, std::exception_ptr unhandledException);
+            void
+            onCoroutineCompleted(impl::StandaloneCoroutine* coroutine, const std::exception_ptr& unhandledException);
             void onAllCoroutinesCompleted();
             void cancelAll();
 

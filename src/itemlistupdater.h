@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -13,11 +13,7 @@
 #include <stdexcept>
 #include <vector>
 
-#if __has_include(<QtClassHelperMacros>)
-#    include <QtClassHelperMacros>
-#else
-#    include <QtGlobal>
-#endif
+#include <QtClassHelperMacros>
 
 namespace tremotesf {
     class ItemBatchProcessor {

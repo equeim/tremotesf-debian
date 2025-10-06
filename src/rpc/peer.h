@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -6,13 +6,12 @@
 #define TREMOTESF_RPC_PEER_H
 
 #include <QString>
-#include "literals.h"
 
 class QJsonObject;
 
 namespace tremotesf {
     struct Peer {
-        static constexpr auto addressKey = "address"_l1;
+        static constexpr auto addressKey = QLatin1String("address");
 
         explicit Peer(QString&& address, const QJsonObject& peerJson);
         bool update(const QJsonObject& peerJson);

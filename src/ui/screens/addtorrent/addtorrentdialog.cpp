@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 // SPDX-FileCopyrightText: 2022 Alex <tabell@users.noreply.github.com>
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -465,8 +465,10 @@ namespace tremotesf {
     void AddTorrentDialog::AddTorrentParametersWidgets::reset(Rpc* rpc) const {
         const auto initialParameters = getInitialAddTorrentParameters(rpc);
         downloadDirectoryWidget->updatePath(initialParameters.downloadDirectory);
-        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-        priorityComboBox->setCurrentIndex(indexOfCasted<int>(priorityComboBoxItems, initialParameters.priority).value()
+        priorityComboBox->setCurrentIndex(
+            // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+            indexOfCasted<int>(priorityComboBoxItems, initialParameters.priority).value()
+
         );
         startTorrentCheckBox->setChecked(initialParameters.startAfterAdding);
         if (deleteTorrentFileGroupBox) {

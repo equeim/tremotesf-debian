@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -26,22 +26,20 @@ namespace tremotesf {
         switch (role) {
         case Qt::CheckStateRole:
             if (column == Column::Name) {
+                using enum TorrentFilesModelEntry::WantedState;
                 switch (entry->wantedState()) {
-                case TorrentFilesModelEntry::Wanted:
+                case Wanted:
                     return Qt::Checked;
-                case TorrentFilesModelEntry::Unwanted:
+                case Unwanted:
                     return Qt::Unchecked;
-                case TorrentFilesModelEntry::MixedWanted:
+                case Mixed:
                     return Qt::PartiallyChecked;
                 }
             }
             break;
         case Qt::DecorationRole:
             if (column == Column::Name) {
-                if (entry->isDirectory()) {
-                    return desktoputils::standardDirIcon();
-                }
-                return desktoputils::standardFileIcon();
+                return entry->icon();
             }
             break;
         case Qt::DisplayRole:
@@ -72,7 +70,7 @@ namespace tremotesf {
             case Column::Progress:
                 return entry->progress();
             case Column::Priority:
-                return entry->priority();
+                return QVariant::fromValue(entry->priority());
             default:
                 return data(index, Qt::DisplayRole);
             }
@@ -144,7 +142,7 @@ namespace tremotesf {
         if (!child.isValid()) {
             return {};
         }
-        TorrentFilesModelDirectory* parentDirectory =
+        const auto* const parentDirectory =
             static_cast<TorrentFilesModelEntry*>(child.internalPointer())->parentDirectory();
         if (parentDirectory == mRootDirectory.get()) {
             return {};

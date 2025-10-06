@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -12,6 +12,8 @@
 #include "rpc/torrent.h"
 #include "rpc/serversettings.h"
 #include "rpc/rpc.h"
+
+using namespace Qt::StringLiterals;
 
 namespace tremotesf {
     namespace {
@@ -170,13 +172,10 @@ namespace tremotesf {
         if (!index.isValid()) {
             return localTorrentDownloadDirectoryPath(mRpc, mTorrent);
         }
-        if (mTorrent->data().singleFile) {
-            return localTorrentRootFilePath(mRpc, mTorrent);
-        }
         const auto* entry = static_cast<const TorrentFilesModelEntry*>(index.internalPointer());
         QString path(entry->path());
         if (!entry->isDirectory() && entry->progress() < 1 && mRpc->serverSettings()->data().renameIncompleteFiles) {
-            path += ".part"_l1;
+            path += ".part"_L1;
         }
         return localTorrentDownloadDirectoryPath(mRpc, mTorrent) % '/' % path;
     }
@@ -185,8 +184,8 @@ namespace tremotesf {
         if (!index.isValid()) {
             return true;
         }
-        return static_cast<const TorrentFilesModelEntry*>(index.internalPointer())->wantedState() !=
-               TorrentFilesModelEntry::Unwanted;
+        return static_cast<const TorrentFilesModelEntry*>(index.internalPointer())->wantedState()
+               != TorrentFilesModelEntry::WantedState::Unwanted;
     }
 
     void TorrentFilesModel::update(std::span<const int> changed) {

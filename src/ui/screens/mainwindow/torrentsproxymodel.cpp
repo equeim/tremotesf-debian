@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -32,8 +32,11 @@ namespace tremotesf {
 
     void TorrentsProxyModel::setSearchString(const QString& string) {
         if (string != mSearchString) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+            beginFilterChange();
+#endif
             mSearchString = string;
-            invalidateFilter();
+            invalidateRowsFilter();
         }
     }
 
@@ -41,8 +44,11 @@ namespace tremotesf {
 
     void TorrentsProxyModel::setStatusFilterEnabled(bool enabled) {
         if (enabled != mStatusFilterEnabled) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+            beginFilterChange();
+#endif
             mStatusFilterEnabled = enabled;
-            invalidateFilter();
+            invalidateRowsFilter();
             Settings::instance()->set_torrentsStatusFilterEnabled(mStatusFilterEnabled);
         }
     }
@@ -51,8 +57,11 @@ namespace tremotesf {
 
     void TorrentsProxyModel::setStatusFilter(TorrentsProxyModel::StatusFilter filter) {
         if (filter != mStatusFilter) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+            beginFilterChange();
+#endif
             mStatusFilter = filter;
-            invalidateFilter();
+            invalidateRowsFilter();
             emit statusFilterChanged();
             Settings::instance()->set_torrentsStatusFilter(mStatusFilter);
         }
@@ -62,8 +71,11 @@ namespace tremotesf {
 
     void TorrentsProxyModel::setLabelFilterEnabled(bool enabled) {
         if (enabled != mLabelFilterEnabled) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+            beginFilterChange();
+#endif
             mLabelFilterEnabled = enabled;
-            invalidateFilter();
+            invalidateRowsFilter();
             Settings::instance()->set_torrentsLabelFilterEnabled(mLabelFilterEnabled);
         }
     }
@@ -72,8 +84,11 @@ namespace tremotesf {
 
     void TorrentsProxyModel::setLabelFilter(const QString& filter) {
         if (filter != mLabelFilter) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+            beginFilterChange();
+#endif
             mLabelFilter = filter;
-            invalidateFilter();
+            invalidateRowsFilter();
             emit labelFilterChanged();
             Settings::instance()->set_torrentsLabelFilter(mLabelFilter);
         }
@@ -83,8 +98,11 @@ namespace tremotesf {
 
     void TorrentsProxyModel::setTrackerFilterEnabled(bool enabled) {
         if (enabled != mTrackerFilterEnabled) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+            beginFilterChange();
+#endif
             mTrackerFilterEnabled = enabled;
-            invalidateFilter();
+            invalidateRowsFilter();
             Settings::instance()->set_torrentsTrackerFilterEnabled(mTrackerFilterEnabled);
         }
     }
@@ -93,8 +111,11 @@ namespace tremotesf {
 
     void TorrentsProxyModel::setTrackerFilter(const QString& filter) {
         if (filter != mTrackerFilter) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+            beginFilterChange();
+#endif
             mTrackerFilter = filter;
-            invalidateFilter();
+            invalidateRowsFilter();
             emit trackerFilterChanged();
             Settings::instance()->set_torrentsTrackerFilter(mTrackerFilter);
         }
@@ -104,8 +125,11 @@ namespace tremotesf {
 
     void TorrentsProxyModel::setDownloadDirectoryFilterEnabled(bool enabled) {
         if (enabled != mDownloadDirectoryFilterEnabled) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+            beginFilterChange();
+#endif
             mDownloadDirectoryFilterEnabled = enabled;
-            invalidateFilter();
+            invalidateRowsFilter();
             Settings::instance()->set_torrentsDownloadDirectoryFilterEnabled(mDownloadDirectoryFilterEnabled);
         }
     }
@@ -114,37 +138,40 @@ namespace tremotesf {
 
     void TorrentsProxyModel::setDownloadDirectoryFilter(const QString& filter) {
         if (filter != mDownloadDirectoryFilter) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+            beginFilterChange();
+#endif
             mDownloadDirectoryFilter = filter;
-            invalidateFilter();
+            invalidateRowsFilter();
             emit downloadDirectoryFilterChanged();
             Settings::instance()->set_torrentsDownloadDirectoryFilter(mDownloadDirectoryFilter);
         }
     }
 
     bool TorrentsProxyModel::statusFilterAcceptsTorrent(const Torrent* torrent, StatusFilter filter) {
+        using enum StatusFilter;
         switch (filter) {
         case Active:
             return (
-                (torrent->data().status == TorrentData::Status::Downloading && !torrent->data().isDownloadingStalled()
-                ) ||
-                (torrent->data().status == TorrentData::Status::Seeding && !torrent->data().isSeedingStalled())
+                (torrent->data().status == TorrentData::Status::Downloading && !torrent->data().isDownloadingStalled())
+                || (torrent->data().status == TorrentData::Status::Seeding && !torrent->data().isSeedingStalled())
             );
         case Downloading:
             return (
-                torrent->data().status == TorrentData::Status::Downloading ||
-                torrent->data().status == TorrentData::Status::QueuedForDownloading
+                torrent->data().status == TorrentData::Status::Downloading
+                || torrent->data().status == TorrentData::Status::QueuedForDownloading
             );
         case Seeding:
             return (
-                torrent->data().status == TorrentData::Status::Seeding ||
-                torrent->data().status == TorrentData::Status::QueuedForSeeding
+                torrent->data().status == TorrentData::Status::Seeding
+                || torrent->data().status == TorrentData::Status::QueuedForSeeding
             );
         case Paused:
             return torrent->data().status == TorrentData::Status::Paused;
         case Checking:
             return (
-                torrent->data().status == TorrentData::Status::Checking ||
-                torrent->data().status == TorrentData::Status::QueuedForChecking
+                torrent->data().status == TorrentData::Status::Checking
+                || torrent->data().status == TorrentData::Status::QueuedForChecking
             );
         case Errored:
             return torrent->data().hasError();
@@ -165,15 +192,13 @@ namespace tremotesf {
         }
 
         if (mLabelFilterEnabled && !mLabelFilter.isEmpty()) {
-            const auto matchingLabel = std::ranges::find(torrent->data().labels, mLabelFilter);
-            if (matchingLabel == torrent->data().labels.end()) {
+            if (!std::ranges::contains(torrent->data().labels, mLabelFilter)) {
                 return false;
             }
         }
 
         if (mTrackerFilterEnabled && !mTrackerFilter.isEmpty()) {
-            const auto matchingTracker = std::ranges::find(torrent->data().trackers, mTrackerFilter, &Tracker::site);
-            if (matchingTracker == torrent->data().trackers.end()) {
+            if (!std::ranges::contains(torrent->data().trackers, mTrackerFilter, &Tracker::site)) {
                 return false;
             }
         }

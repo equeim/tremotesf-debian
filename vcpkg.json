@@ -16,6 +16,7 @@
                 "network",
                 "pcre2",
                 "png",
+                "shared-mime-info",
                 "testlib",
                 "thread",
                 "widgets",
@@ -43,18 +44,21 @@
         "cxxopts",
         {
             "name": "cpp-httplib",
-            "default-features": false,
             "features": [
-                {
-                    "name": "openssl",
-                    "platform": "!(windows & arm64)"
-                }
+                "openssl"
             ]
         },
         {
             "name": "pkgconf",
             "platform": "windows",
             "host": true
+        }
+    ],
+    "overrides": [
+        {
+            "name": "double-conversion",
+            "version": "3.3.0",
+            "port-version": 1
         }
     ]
 }

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -55,8 +55,6 @@ namespace tremotesf {
                 return data(index, Qt::DisplayRole);
             }
             return item.displayDirectory;
-        case static_cast<int>(Role::AlwaysShowTooltip):
-            return !mDisplayFullDownloadDirectoryPath && !item.directory.isEmpty();
         default:
             return {};
         }
@@ -111,8 +109,8 @@ namespace tremotesf {
             return false;
         }
 
-        DownloadDirectoriesModel::DirectoryItem createItemFromNewItem(DownloadDirectoriesModel::DirectoryItem&& newItem
-        ) override {
+        DownloadDirectoriesModel::DirectoryItem
+        createItemFromNewItem(DownloadDirectoriesModel::DirectoryItem&& newItem) override {
             return DownloadDirectoriesModel::DirectoryItem{std::move(newItem)};
         }
     };

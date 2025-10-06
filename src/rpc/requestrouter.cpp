@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -9,6 +9,7 @@
 #include "requestrouter.h"
 
 #include <optional>
+#include <ranges>
 
 #include <QJsonDocument>
 #include <QObject>
@@ -23,9 +24,11 @@
 #include "coroutines/network.h"
 #include "coroutines/threadpool.h"
 #include "log/log.h"
-#include "literals.h"
 #include "pragmamacros.h"
+#include "qsslcertificateformatter.h"
 #include "rpc.h"
+
+using namespace Qt::StringLiterals;
 
 DISABLE_RANGE_FORMATTING(QJsonObject)
 SPECIALIZE_FORMATTER_FOR_QDEBUG(QJsonObject)
@@ -33,21 +36,6 @@ SPECIALIZE_FORMATTER_FOR_QDEBUG(QNetworkProxy)
 SPECIALIZE_FORMATTER_FOR_QDEBUG(QSslError)
 
 namespace fmt {
-    template<>
-    struct formatter<QSslCertificate> : tremotesf::SimpleFormatter {
-        fmt::format_context::iterator format(const QSslCertificate& certificate, fmt::format_context& ctx) const {
-            // QSslCertificate::toText is implemented only for OpenSSL backend
-#if QT_VERSION_MAJOR >= 6
-            using tremotesf::operator""_l1;
-            static const bool isOpenSSL = (QSslSocket::activeBackend() == "openssl"_l1);
-            if (!isOpenSSL) {
-                return tremotesf::impl::QDebugFormatter<QSslCertificate>{}.format(certificate, ctx);
-            }
-#endif
-            return fmt::formatter<QString>{}.format(certificate.toText(), ctx);
-        }
-    };
-
     template<>
     struct formatter<QSsl::SslProtocol> : tremotesf::SimpleFormatter {
         fmt::format_context::iterator format(QSsl::SslProtocol protocol, fmt::format_context& ctx) const {
@@ -84,26 +72,14 @@ namespace fmt {
                     return "TlsV1_3OrLater";
                 case QSsl::UnknownProtocol:
                     return "UnknownProtocol";
-#if QT_VERSION_MAJOR < 6
-                case QSsl::SslV3:
-                    return "SslV3";
-                case QSsl::SslV2:
-                    return "SslV2";
-                case QSsl::TlsV1SslV3:
-                    return "TlsV1SslV3";
-#endif
                 }
                 SUPPRESS_DEPRECATED_WARNINGS_END
                 return std::nullopt;
             }();
             if (str) {
-                return fmt::format_to(ctx.out(), tremotesf::impl::singleArgumentFormatString, *str);
+                return fmt::format_to(ctx.out(), tremotesf::singleArgumentFormatString, *str);
             }
-            return fmt::format_to(
-                ctx.out(),
-                tremotesf::impl::singleArgumentFormatString,
-                static_cast<std::underlying_type_t<QSsl::SslProtocol>>(protocol)
-            );
+            return fmt::format_to(ctx.out(), tremotesf::singleArgumentFormatString, std::to_underlying(protocol));
         }
     };
 }
@@ -114,15 +90,14 @@ namespace tremotesf::impl {
     };
 
     namespace {
-        const auto sessionIdHeader = QByteArrayLiteral("X-Transmission-Session-Id");
-        const auto authorizationHeader = QByteArrayLiteral("Authorization");
+        constexpr auto sessionIdHeader = "X-Transmission-Session-Id"_L1;
 
         QJsonObject getReplyArguments(const QJsonObject& parseResult) {
-            return parseResult.value("arguments"_l1).toObject();
+            return parseResult.value("arguments"_L1).toObject();
         }
 
         bool isResultSuccessful(const QJsonObject& parseResult) {
-            return (parseResult.value("result"_l1).toString() == "success"_l1);
+            return (parseResult.value("result"_L1).toString() == "success"_L1);
         }
 
         QString httpStatus(QNetworkReply* reply) {
@@ -150,46 +125,53 @@ namespace tremotesf::impl {
             if (reply->url() == reply->request().url()) {
                 detailedErrorMessage += QString::fromStdString(fmt::format("\nURL: {}", reply->url().toString()));
             } else {
-                detailedErrorMessage += QString::fromStdString(fmt::format(
-                    "\nOriginal URL: {}\nRedirected URL: {}",
-                    reply->request().url().toString(),
-                    reply->url().toString()
-                ));
+                detailedErrorMessage += QString::fromStdString(
+                    fmt::format(
+                        "\nOriginal URL: {}\nRedirected URL: {}",
+                        reply->request().url().toString(),
+                        reply->url().toString()
+                    )
+                );
             }
             if (const auto status = httpStatus(reply); !status.isEmpty()) {
-                detailedErrorMessage += QString::fromStdString(fmt::format(
-                    "\nHTTP status: {}\nConnection was encrypted: {}",
-                    status,
-                    reply->attribute(QNetworkRequest::ConnectionEncryptedAttribute).toBool()
-                ));
-                if (!reply->rawHeaderPairs().isEmpty()) {
-                    detailedErrorMessage += "\nReply headers:"_l1;
-                    for (const QNetworkReply::RawHeaderPair& pair : reply->rawHeaderPairs()) {
+                detailedErrorMessage += QString::fromStdString(
+                    fmt::format(
+                        "\nHTTP status: {}\nConnection was encrypted: {}",
+                        status,
+                        reply->attribute(QNetworkRequest::ConnectionEncryptedAttribute).toBool()
+                    )
+                );
+                const auto headers = reply->headers();
+                if (!headers.isEmpty()) {
+                    detailedErrorMessage += "\nReply headers:"_L1;
+                    for (auto i : std::views::iota(qsizetype{0}, headers.size())) {
                         detailedErrorMessage +=
-                            QString::fromStdString(fmt::format("\n  {}: {}", pair.first, pair.second));
+                            QString::fromStdString(fmt::format("\n  {}: {}", headers.nameAt(i), headers.valueAt(i)));
                     }
                 }
             } else {
-                detailedErrorMessage += "\nDid not establish HTTP connection"_l1;
+                detailedErrorMessage += "\nDid not establish HTTP connection"_L1;
             }
             if (!sslErrors.isEmpty()) {
                 detailedErrorMessage += QString::fromStdString(fmt::format("\n\n{} TLS errors:", sslErrors.size()));
                 int i = 1;
                 for (const QSslError& sslError : sslErrors) {
-                    detailedErrorMessage += QString::fromStdString(fmt::format(
-                        "\n\n {}. {}: {} on certificate:\n - {}",
-                        i,
-                        sslError.error(),
-                        sslError.errorString(),
-                        sslError.certificate()
-                    ));
+                    detailedErrorMessage += QString::fromStdString(
+                        fmt::format(
+                            "\n\n{}. {}: {}\n{}",
+                            i,
+                            sslError.error(),
+                            sslError.errorString(),
+                            sslError.certificate()
+                        )
+                    );
                     ++i;
                 }
             }
             return detailedErrorMessage;
         }
 
-        QNetworkRequest takeRequest(NetworkReplyUniquePtr reply) { return reply->request(); }
+        QNetworkRequest getOriginalRequestAndDeleteReply(NetworkReplyUniquePtr reply) { return reply->request(); }
     }
 
     struct RpcRequestMetadata {
@@ -214,10 +196,13 @@ namespace tremotesf::impl {
 
         mConfiguration = std::move(configuration);
 
+        mRequestHeaders.clear();
+        mRequestHeaders.append(QHttpHeaders::WellKnownHeader::ContentType, "application/json"_L1);
+
         mNetwork->setProxy(mConfiguration->proxy);
         mNetwork->clearAccessCache();
 
-        const bool https = mConfiguration->serverUrl.scheme() == "https"_l1;
+        const bool https = mConfiguration->serverUrl.scheme() == "https"_L1;
 
         mSslConfiguration = QSslConfiguration::defaultConfiguration();
         if (https) {
@@ -228,13 +213,49 @@ namespace tremotesf::impl {
                 mSslConfiguration.setPrivateKey(mConfiguration->clientPrivateKey);
             }
             mExpectedSslErrors.clear();
-            mExpectedSslErrors.reserve(mConfiguration->serverCertificateChain.size() * 4);
-            for (const auto& certificate : mConfiguration->serverCertificateChain) {
-                mExpectedSslErrors.push_back(QSslError(QSslError::HostNameMismatch, certificate));
-                mExpectedSslErrors.push_back(QSslError(QSslError::SelfSignedCertificate, certificate));
-                mExpectedSslErrors.push_back(QSslError(QSslError::SelfSignedCertificateInChain, certificate));
-                mExpectedSslErrors.push_back(QSslError(QSslError::CertificateUntrusted, certificate));
-            }
+
+            std::visit(
+                [&](const auto& settings) {
+                    using T = std::remove_cvref_t<decltype(settings)>;
+                    if constexpr (std::same_as<T, RequestsConfiguration::SelfSignedCertificate>) {
+                        if (settings.certificate.isNull()) {
+                            warning().log("Server's self-signed certificate is null");
+                            return;
+                        }
+                        debug().log("Server's self-signed certificate:\n{}", settings.certificate);
+                        if (!settings.certificate.isSelfSigned()) {
+                            warning().log("Server's self-signed certificate is not actually self signed");
+                            return;
+                        }
+                        mExpectedSslErrors.push_back(QSslError(QSslError::SelfSignedCertificate, settings.certificate));
+                        mExpectedSslErrors.push_back(QSslError(QSslError::CertificateUntrusted, settings.certificate));
+                        mExpectedSslErrors.push_back(QSslError(QSslError::HostNameMismatch, settings.certificate));
+                    } else if constexpr (std::same_as<T, RequestsConfiguration::CustomRoot>) {
+                        if (settings.rootCertificate.isNull()) {
+                            warning().log("Server's root certificate is null");
+                            return;
+                        }
+                        debug().log("Server's root certificate:\n{}", settings.rootCertificate);
+                        if (!settings.rootCertificate.isSelfSigned()) {
+                            // Using setCaCertificates instead of addCaCertificate since the latter one can confuse Windows schannel TLS backend
+                            // We don't need system CA certificates here anyway
+                            warning().log("Server's root certificate is not self-signed");
+                            return;
+                        }
+                        mSslConfiguration.setCaCertificates({settings.rootCertificate});
+                        if (settings.leafCertificate.isNull()) {
+                            warning().log(
+                                "Server's leaf certificate is null. Certificate validation might fail if its host name "
+                                "is not configured correctly"
+                            );
+                            return;
+                        }
+                        debug().log("Server's leaf certificate:\n{}", settings.leafCertificate);
+                        mExpectedSslErrors.push_back(QSslError(QSslError::HostNameMismatch, settings.leafCertificate));
+                    }
+                },
+                mConfiguration->serverCertificate
+            );
         }
 
         if (!mConfiguration->serverUrl.isEmpty()) {
@@ -246,23 +267,33 @@ namespace tremotesf::impl {
             debug().log(" - Timeout: {}", mConfiguration->timeout);
             debug().log(" - HTTP Basic access authentication: {}", mConfiguration->authentication);
             if (mConfiguration->authentication) {
-                auto base64Credentials = QString("%1:%2")
+                auto base64Credentials = QString("%1:%2"_L1)
                                              .arg(mConfiguration->username, mConfiguration->password)
                                              .normalized(QString::NormalizationForm_C)
                                              .toUtf8()
                                              .toBase64();
-                mAuthorizationHeaderValue = QByteArray("Basic ").append(base64Credentials);
+                mRequestHeaders.append(QHttpHeaders::WellKnownHeader::Authorization, "Basic "_ba + base64Credentials);
             }
             if (https) {
-#if QT_VERSION_MAJOR >= 6
                 debug().log(" - Available TLS backends: {}", QSslSocket::availableBackends());
                 debug().log(" - Active TLS backend: {}", QSslSocket::activeBackend());
                 debug().log(" - Supported TLS protocols: {}", QSslSocket::supportedProtocols());
-#endif
                 debug().log(" - TLS library version: {}", QSslSocket::sslLibraryVersionString());
                 debug().log(
-                    " - Manually validating server's certificate chain: {}",
-                    !mConfiguration->serverCertificateChain.isEmpty()
+                    " - Server's certificate settings: {}",
+                    std::visit(
+                        [&](const auto& settings) {
+                            using T = std::remove_cvref_t<decltype(settings)>;
+                            if constexpr (std::same_as<T, RequestsConfiguration::SelfSignedCertificate>) {
+                                return "self-signed certificate";
+                            } else if constexpr (std::same_as<T, RequestsConfiguration::CustomRoot>) {
+                                return "custom CA root";
+                            } else {
+                                return "none";
+                            }
+                        },
+                        mConfiguration->serverCertificate
+                    )
                 );
                 debug().log(
                     " - Client certificate authentication: {}",
@@ -275,28 +306,27 @@ namespace tremotesf::impl {
     void RequestRouter::resetConfiguration() {
         debug().log("Resetting requests configuration");
         mConfiguration.reset();
+        mRequestHeaders.clear();
+        mSslConfiguration = {};
+        mExpectedSslErrors.clear();
+        mNetwork->setProxy(QNetworkProxy::NoProxy);
         mNetwork->clearAccessCache();
     }
 
+    QByteArrayView RequestRouter::sessionId() const { return mRequestHeaders.value(sessionIdHeader); }
+
     Coroutine<RequestRouter::Response> RequestRouter::postRequest(QLatin1String method, QJsonObject arguments) {
-        co_return co_await postRequest(method, makeRequestData(method, arguments));
+        co_return co_await postRequest(method, makeRequestData(method, std::move(arguments)));
     }
 
     Coroutine<RequestRouter::Response> RequestRouter::postRequest(QLatin1String method, QByteArray data) {
         if (!mConfiguration.has_value()) {
             throw std::runtime_error("Requests configuration is not set");
         }
-
         QNetworkRequest request(mConfiguration->serverUrl);
-        request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json"_l1);
-        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-        if (mConfiguration->authentication) {
-            request.setRawHeader(authorizationHeader, mAuthorizationHeaderValue);
-        }
+        request.setHeaders(mRequestHeaders);
         request.setSslConfiguration(mSslConfiguration);
-        request.setTransferTimeout(
-            static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(mConfiguration->timeout).count())
-        );
+        request.setTransferTimeout(mConfiguration->timeout);
         NetworkRequestMetadata metadata{};
         metadata.postData = data;
         metadata.rpcMetadata = {method};
@@ -311,22 +341,21 @@ namespace tremotesf::impl {
             }
         }
         mNetwork->clearConnectionCache();
-        mSessionId.clear();
+        mRequestHeaders.removeAll(sessionIdHeader);
     }
 
     QByteArray RequestRouter::makeRequestData(QLatin1String method, QJsonObject arguments) {
-        return QJsonDocument(QJsonObject{
-                                 {QStringLiteral("method"), QJsonValue(QString(method))},
-                                 {QStringLiteral("arguments"), QJsonValue(std::move(arguments))},
-                             })
+        return QJsonDocument(
+                   QJsonObject{
+                       {u"method"_s, method},
+                       {u"arguments"_s, std::move(arguments)},
+                   }
+        )
             .toJson(QJsonDocument::Compact);
     }
 
     Coroutine<RequestRouter::Response>
     RequestRouter::performRequest(QNetworkRequest request, NetworkRequestMetadata metadata) {
-        if (!mSessionId.isEmpty()) {
-            request.setRawHeader(sessionIdHeader, mSessionId);
-        }
         NetworkReplyUniquePtr reply(mNetwork->post(request, metadata.postData));
 
         auto expectedSslErrors = mExpectedSslErrors;
@@ -383,18 +412,16 @@ namespace tremotesf::impl {
     Coroutine<RequestRouter::Response> RequestRouter::onRequestError(
         NetworkReplyUniquePtr reply, QList<QSslError> sslErrors, NetworkRequestMetadata metadata
     ) {
-        if (reply->error() == QNetworkReply::ContentConflictError && reply->hasRawHeader(sessionIdHeader)) {
-            QByteArray newSessionId = reply->rawHeader(sessionIdHeader);
-            // Check against session id of request instead of current session id,
-            // to handle case when current session id have already been overwritten by another failed request
-            if (newSessionId != reply->request().rawHeader(sessionIdHeader)) {
-                if (!mSessionId.isEmpty()) {
-                    info().log("Session id changed");
-                }
+        if (reply->error() == QNetworkReply::ContentConflictError) {
+            const auto replyHeaders = reply->headers();
+            const auto newSessionId = replyHeaders.value(sessionIdHeader);
+            if (!newSessionId.isEmpty() && newSessionId != reply->request().headers().value(sessionIdHeader)) {
                 debug().log("Session id is {}, retrying '{}' request", newSessionId, metadata.rpcMetadata.method);
-                mSessionId = std::move(newSessionId);
+                mRequestHeaders.replaceOrAppend(sessionIdHeader, newSessionId);
                 // Retry without incrementing retryAttempts
-                co_return co_await performRequest(takeRequest(std::move(reply)), metadata);
+                auto request = getOriginalRequestAndDeleteReply(std::move(reply));
+                request.setHeaders(mRequestHeaders);
+                co_return co_await performRequest(request, metadata);
             }
         }
 
@@ -426,7 +453,7 @@ namespace tremotesf::impl {
             metadata.retryAttempts++;
             warning()
                 .log("Retrying '{}' request, retry attempts = {}", metadata.rpcMetadata.method, metadata.retryAttempts);
-            co_return co_await performRequest(takeRequest(std::move(reply)), metadata);
+            co_return co_await performRequest(getOriginalRequestAndDeleteReply(std::move(reply)), metadata);
         }
         emit requestFailed(error, reply->errorString(), detailedErrorMessage);
         cancelCoroutine();

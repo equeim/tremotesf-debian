@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -6,8 +6,6 @@
 #define TREMOTESF_IPCSERVER_DBUS_SERVICE_H
 
 #include <QObject>
-
-#include "literals.h"
 
 class OrgFreedesktopApplicationAdaptor;
 
@@ -18,8 +16,8 @@ namespace tremotesf {
         Q_OBJECT
 
     public:
-        static constexpr auto desktopStartupIdField = "desktop-startup-id"_l1;
-        static constexpr auto xdgActivationTokenField = "activation-token"_l1;
+        static constexpr auto desktopStartupIdField = QLatin1String("desktop-startup-id");
+        static constexpr auto xdgActivationTokenField = QLatin1String("activation-token");
 
         IpcDbusService(IpcServerDbus* ipcServer, QObject* parent = nullptr);
 

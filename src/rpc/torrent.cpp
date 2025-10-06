@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -22,6 +22,8 @@
 #include "itemlistupdater.h"
 #include "pathutils.h"
 #include "stdutils.h"
+
+using namespace Qt::StringLiterals;
 
 namespace tremotesf {
     using namespace impl;
@@ -71,107 +73,108 @@ namespace tremotesf {
         CreationDate,
         Comment,
         TrackerStats,
-        FileCount,
         Labels,
 
         Count
     };
 
     namespace {
+        constexpr auto allUpdateKeys =
+            std::views::iota(0, static_cast<int>(TorrentData::UpdateKey::Count))
+            | std::views::transform([](int key) { return static_cast<TorrentData::UpdateKey>(key); });
+
         constexpr QLatin1String updateKeyString(TorrentData::UpdateKey key) {
             switch (key) {
             case TorrentData::UpdateKey::Id:
-                return "id"_l1;
+                return "id"_L1;
             case TorrentData::UpdateKey::HashString:
-                return "hashString"_l1;
+                return "hashString"_L1;
             case TorrentData::UpdateKey::AddedDate:
-                return "addedDate"_l1;
+                return "addedDate"_L1;
             case TorrentData::UpdateKey::Name:
-                return "name"_l1;
+                return "name"_L1;
             case TorrentData::UpdateKey::MagnetLink:
-                return "magnetLink"_l1;
+                return "magnetLink"_L1;
             case TorrentData::UpdateKey::QueuePosition:
-                return "queuePosition"_l1;
+                return "queuePosition"_L1;
             case TorrentData::UpdateKey::TotalSize:
-                return "totalSize"_l1;
+                return "totalSize"_L1;
             case TorrentData::UpdateKey::CompletedSize:
-                return "haveValid"_l1;
+                return "haveValid"_L1;
             case TorrentData::UpdateKey::LeftUntilDone:
-                return "leftUntilDone"_l1;
+                return "leftUntilDone"_L1;
             case TorrentData::UpdateKey::SizeWhenDone:
-                return "sizeWhenDone"_l1;
+                return "sizeWhenDone"_L1;
             case TorrentData::UpdateKey::PercentDone:
-                return "percentDone"_l1;
+                return "percentDone"_L1;
             case TorrentData::UpdateKey::RecheckProgress:
-                return "recheckProgress"_l1;
+                return "recheckProgress"_L1;
             case TorrentData::UpdateKey::Eta:
-                return "eta"_l1;
+                return "eta"_L1;
             case TorrentData::UpdateKey::MetadataPercentComplete:
-                return "metadataPercentComplete"_l1;
+                return "metadataPercentComplete"_L1;
             case TorrentData::UpdateKey::DownloadSpeed:
-                return "rateDownload"_l1;
+                return "rateDownload"_L1;
             case TorrentData::UpdateKey::UploadSpeed:
-                return "rateUpload"_l1;
+                return "rateUpload"_L1;
             case TorrentData::UpdateKey::DownloadSpeedLimited:
-                return "downloadLimited"_l1;
+                return "downloadLimited"_L1;
             case TorrentData::UpdateKey::DownloadSpeedLimit:
-                return "downloadLimit"_l1;
+                return "downloadLimit"_L1;
             case TorrentData::UpdateKey::UploadSpeedLimited:
-                return "uploadLimited"_l1;
+                return "uploadLimited"_L1;
             case TorrentData::UpdateKey::UploadSpeedLimit:
-                return "uploadLimit"_l1;
+                return "uploadLimit"_L1;
             case TorrentData::UpdateKey::TotalDownloaded:
-                return "downloadedEver"_l1;
+                return "downloadedEver"_L1;
             case TorrentData::UpdateKey::TotalUploaded:
-                return "uploadedEver"_l1;
+                return "uploadedEver"_L1;
             case TorrentData::UpdateKey::Ratio:
-                return "uploadRatio"_l1;
+                return "uploadRatio"_L1;
             case TorrentData::UpdateKey::RatioLimitMode:
-                return "seedRatioMode"_l1;
+                return "seedRatioMode"_L1;
             case TorrentData::UpdateKey::RatioLimit:
-                return "seedRatioLimit"_l1;
+                return "seedRatioLimit"_L1;
             case TorrentData::UpdateKey::PeersSendingToUsCount:
-                return "peersSendingToUs"_l1;
+                return "peersSendingToUs"_L1;
             case TorrentData::UpdateKey::PeersGettingFromUsCount:
-                return "peersGettingFromUs"_l1;
+                return "peersGettingFromUs"_L1;
             case TorrentData::UpdateKey::WebSeeders:
-                return "webseeds"_l1;
+                return "webseeds"_L1;
             case TorrentData::UpdateKey::WebSeedersSendingToUsCount:
-                return "webseedsSendingToUs"_l1;
+                return "webseedsSendingToUs"_L1;
             case TorrentData::UpdateKey::Status:
-                return "status"_l1;
+                return "status"_L1;
             case TorrentData::UpdateKey::Error:
-                return "error"_l1;
+                return "error"_L1;
             case TorrentData::UpdateKey::ErrorString:
-                return "errorString"_l1;
+                return "errorString"_L1;
             case TorrentData::UpdateKey::ActivityDate:
-                return "activityDate"_l1;
+                return "activityDate"_L1;
             case TorrentData::UpdateKey::DoneDate:
-                return "doneDate"_l1;
+                return "doneDate"_L1;
             case TorrentData::UpdateKey::PeersLimit:
-                return "peer-limit"_l1;
+                return "peer-limit"_L1;
             case TorrentData::UpdateKey::HonorSessionLimits:
-                return "honorsSessionLimits"_l1;
+                return "honorsSessionLimits"_L1;
             case TorrentData::UpdateKey::BandwidthPriority:
-                return "bandwidthPriority"_l1;
+                return "bandwidthPriority"_L1;
             case TorrentData::UpdateKey::IdleSeedingLimitMode:
-                return "seedIdleMode"_l1;
+                return "seedIdleMode"_L1;
             case TorrentData::UpdateKey::IdleSeedingLimit:
-                return "seedIdleLimit"_l1;
+                return "seedIdleLimit"_L1;
             case TorrentData::UpdateKey::DownloadDirectory:
-                return "downloadDir"_l1;
+                return "downloadDir"_L1;
             case TorrentData::UpdateKey::Creator:
-                return "creator"_l1;
+                return "creator"_L1;
             case TorrentData::UpdateKey::CreationDate:
-                return "dateCreated"_l1;
+                return "dateCreated"_L1;
             case TorrentData::UpdateKey::Comment:
-                return "comment"_l1;
+                return "comment"_L1;
             case TorrentData::UpdateKey::TrackerStats:
-                return "trackerStats"_l1;
-            case TorrentData::UpdateKey::FileCount:
-                return "file-count"_l1;
+                return "trackerStats"_L1;
             case TorrentData::UpdateKey::Labels:
-                return "labels"_l1;
+                return "labels"_L1;
             case TorrentData::UpdateKey::Count:
                 return {};
             }
@@ -181,8 +184,7 @@ namespace tremotesf {
         std::optional<TorrentData::UpdateKey> mapUpdateKey(const QString& stringKey) {
             static const auto mapping = [] {
                 std::map<QLatin1String, TorrentData::UpdateKey, std::less<>> map{};
-                for (int i = 0; i < static_cast<int>(TorrentData::UpdateKey::Count); ++i) {
-                    const auto key = static_cast<TorrentData::UpdateKey>(i);
+                for (auto key : allUpdateKeys) {
                     map.emplace(updateKeyString(key), key);
                 }
                 return map;
@@ -195,53 +197,62 @@ namespace tremotesf {
             return static_cast<TorrentData::UpdateKey>(foundKey->second);
         }
 
-        constexpr auto prioritiesKey = "priorities"_l1;
-        constexpr auto wantedFilesKey = "files-wanted"_l1;
-        constexpr auto unwantedFilesKey = "files-unwanted"_l1;
+        constexpr auto wantedFilesKey = "files-wanted"_L1;
+        constexpr auto unwantedFilesKey = "files-unwanted"_L1;
 
-        constexpr auto lowPriorityKey = "priority-low"_l1;
-        constexpr auto normalPriorityKey = "priority-normal"_l1;
-        constexpr auto highPriorityKey = "priority-high"_l1;
+        constexpr auto lowPriorityKey = "priority-low"_L1;
+        constexpr auto normalPriorityKey = "priority-normal"_L1;
+        constexpr auto highPriorityKey = "priority-high"_L1;
 
-        constexpr auto addTrackerKey = "trackerAdd"_l1;
-        constexpr auto replaceTrackerKey = "trackerReplace"_l1;
-        constexpr auto removeTrackerKey = "trackerRemove"_l1;
-        constexpr auto trackerListKey = "trackerList"_l1;
+        constexpr auto addTrackerKey = "trackerAdd"_L1;
+        constexpr auto replaceTrackerKey = "trackerReplace"_L1;
+        constexpr auto removeTrackerKey = "trackerRemove"_L1;
+        constexpr auto trackerListKey = "trackerList"_L1;
 
-        constexpr auto statusMapper = EnumMapper(std::array{
-            EnumMapping(TorrentData::Status::Paused, 0),
-            EnumMapping(TorrentData::Status::QueuedForChecking, 1),
-            EnumMapping(TorrentData::Status::Checking, 2),
-            EnumMapping(TorrentData::Status::QueuedForDownloading, 3),
-            EnumMapping(TorrentData::Status::Downloading, 4),
-            EnumMapping(TorrentData::Status::QueuedForSeeding, 5),
-            EnumMapping(TorrentData::Status::Seeding, 6)
-        });
+        constexpr auto statusMapper = EnumMapper(
+            std::array{
+                EnumMapping(TorrentData::Status::Paused, 0),
+                EnumMapping(TorrentData::Status::QueuedForChecking, 1),
+                EnumMapping(TorrentData::Status::Checking, 2),
+                EnumMapping(TorrentData::Status::QueuedForDownloading, 3),
+                EnumMapping(TorrentData::Status::Downloading, 4),
+                EnumMapping(TorrentData::Status::QueuedForSeeding, 5),
+                EnumMapping(TorrentData::Status::Seeding, 6)
+            }
+        );
 
-        constexpr auto errorMapper = EnumMapper(std::array{
-            EnumMapping(TorrentData::Error::None, 0),
-            EnumMapping(TorrentData::Error::TrackerWarning, 1),
-            EnumMapping(TorrentData::Error::TrackerError, 2),
-            EnumMapping(TorrentData::Error::LocalError, 3)
-        });
+        constexpr auto errorMapper = EnumMapper(
+            std::array{
+                EnumMapping(TorrentData::Error::None, 0),
+                EnumMapping(TorrentData::Error::TrackerWarning, 1),
+                EnumMapping(TorrentData::Error::TrackerError, 2),
+                EnumMapping(TorrentData::Error::LocalError, 3)
+            }
+        );
 
-        constexpr auto priorityMapper = EnumMapper(std::array{
-            EnumMapping(TorrentData::Priority::Low, -1),
-            EnumMapping(TorrentData::Priority::Normal, 0),
-            EnumMapping(TorrentData::Priority::High, 1)
-        });
+        constexpr auto priorityMapper = EnumMapper(
+            std::array{
+                EnumMapping(TorrentData::Priority::Low, -1),
+                EnumMapping(TorrentData::Priority::Normal, 0),
+                EnumMapping(TorrentData::Priority::High, 1)
+            }
+        );
 
-        constexpr auto ratioLimitModeMapper = EnumMapper(std::array{
-            EnumMapping(TorrentData::RatioLimitMode::Global, 0),
-            EnumMapping(TorrentData::RatioLimitMode::Single, 1),
-            EnumMapping(TorrentData::RatioLimitMode::Unlimited, 2)
-        });
+        constexpr auto ratioLimitModeMapper = EnumMapper(
+            std::array{
+                EnumMapping(TorrentData::RatioLimitMode::Global, 0),
+                EnumMapping(TorrentData::RatioLimitMode::Single, 1),
+                EnumMapping(TorrentData::RatioLimitMode::Unlimited, 2)
+            }
+        );
 
-        constexpr auto idleSeedingLimitModeMapper = EnumMapper(std::array{
-            EnumMapping(TorrentData::IdleSeedingLimitMode::Global, 0),
-            EnumMapping(TorrentData::IdleSeedingLimitMode::Single, 1),
-            EnumMapping(TorrentData::IdleSeedingLimitMode::Unlimited, 2)
-        });
+        constexpr auto idleSeedingLimitModeMapper = EnumMapper(
+            std::array{
+                EnumMapping(TorrentData::IdleSeedingLimitMode::Global, 0),
+                EnumMapping(TorrentData::IdleSeedingLimitMode::Single, 1),
+                EnumMapping(TorrentData::IdleSeedingLimitMode::Unlimited, 2)
+            }
+        );
     }
 
     int TorrentData::priorityToInt(Priority value) { return priorityMapper.toJsonConstant(value); }
@@ -265,11 +276,9 @@ namespace tremotesf {
         const Rpc* rpc
     ) {
         bool changed = false;
-        const auto count = std::min(keys.size(), static_cast<size_t>(values.size()));
-        for (size_t i = 0; i < count; ++i) {
-            const auto key = keys[i];
+        for (const auto& [key, value] : std::views::zip(keys, values)) {
             if (key.has_value()) {
-                updateProperty(*key, values[static_cast<QJsonArray::size_type>(i)], changed, firstTime, rpc);
+                updateProperty(*key, value, changed, firstTime, rpc);
             }
         }
         applyTrackerErrorWorkaround(changed);
@@ -301,16 +310,16 @@ namespace tremotesf {
             setChanged(queuePosition, value.toInt(), changed);
             return;
         case TorrentData::UpdateKey::TotalSize:
-            setChanged(totalSize, toInt64(value), changed);
+            setChanged(totalSize, value.toInteger(), changed);
             return;
         case TorrentData::UpdateKey::CompletedSize:
-            setChanged(completedSize, toInt64(value), changed);
+            setChanged(completedSize, value.toInteger(), changed);
             return;
         case TorrentData::UpdateKey::LeftUntilDone:
-            setChanged(leftUntilDone, toInt64(value), changed);
+            setChanged(leftUntilDone, value.toInteger(), changed);
             return;
         case TorrentData::UpdateKey::SizeWhenDone:
-            setChanged(sizeWhenDone, toInt64(value), changed);
+            setChanged(sizeWhenDone, value.toInteger(), changed);
             return;
         case TorrentData::UpdateKey::PercentDone:
             setChanged(percentDone, value.toDouble(), changed);
@@ -325,10 +334,10 @@ namespace tremotesf {
             setChanged(metadataComplete, value.toInt() == 1, changed);
             return;
         case TorrentData::UpdateKey::DownloadSpeed:
-            setChanged(downloadSpeed, toInt64(value), changed);
+            setChanged(downloadSpeed, value.toInteger(), changed);
             return;
         case TorrentData::UpdateKey::UploadSpeed:
-            setChanged(uploadSpeed, toInt64(value), changed);
+            setChanged(uploadSpeed, value.toInteger(), changed);
             return;
         case TorrentData::UpdateKey::DownloadSpeedLimited:
             setChanged(downloadSpeedLimited, value.toBool(), changed);
@@ -343,10 +352,10 @@ namespace tremotesf {
             setChanged(uploadSpeedLimit, value.toInt(), changed);
             return;
         case TorrentData::UpdateKey::TotalDownloaded:
-            setChanged(totalDownloaded, toInt64(value), changed);
+            setChanged(totalDownloaded, value.toInteger(), changed);
             return;
         case TorrentData::UpdateKey::TotalUploaded:
-            setChanged(totalUploaded, toInt64(value), changed);
+            setChanged(totalUploaded, value.toInteger(), changed);
             return;
         case TorrentData::UpdateKey::Ratio:
             setChanged(ratio, value.toDouble(), changed);
@@ -366,9 +375,9 @@ namespace tremotesf {
         case TorrentData::UpdateKey::WebSeeders: {
             setChanged(
                 webSeeders,
-                toContainer<std::vector>(value.toArray() | std::views::transform([](auto value) {
-                                             return value.toString();
-                                         })),
+                value.toArray() | std::views::transform([](auto value) {
+                    return value.toString();
+                }) | std::ranges::to<std::vector>(),
                 changed
             );
             return;
@@ -434,7 +443,7 @@ namespace tremotesf {
             int newTotalLeechers{};
             for (const auto& i : trackerJsons) {
                 const QJsonObject trackerMap = i.toObject();
-                const int trackerId = trackerMap.value("id"_l1).toInt();
+                const int trackerId = trackerMap.value("id"_L1).toInt();
                 const auto found = std::ranges::find(trackers, trackerId, &Tracker::id);
                 if (found == trackers.end()) {
                     newTrackers.emplace_back(trackerId, trackerMap);
@@ -453,15 +462,12 @@ namespace tremotesf {
             setChanged(totalLeechersFromTrackersCount, newTotalLeechers, changed);
             return;
         }
-        case TorrentData::UpdateKey::FileCount:
-            setChanged(singleFile, value.toInt() == 1, changed);
-            return;
         case TorrentData::UpdateKey::Labels: {
             setChanged(
                 labels,
-                toContainer<std::vector>(value.toArray() | std::views::transform([](auto value) {
-                                             return value.toString();
-                                         })),
+                value.toArray() | std::views::transform([](auto value) {
+                    return value.toString();
+                }) | std::ranges::to<std::vector>(),
                 changed
             );
             return;
@@ -509,11 +515,7 @@ namespace tremotesf {
 
     QJsonArray Torrent::updateFields(const ServerSettings* serverSettings) {
         QJsonArray fields{};
-        for (int i = 0; i < static_cast<int>(TorrentData::UpdateKey::Count); ++i) {
-            const auto key = static_cast<TorrentData::UpdateKey>(i);
-            if (key == TorrentData::UpdateKey::FileCount && !serverSettings->data().hasFileCountProperty()) {
-                continue;
-            }
+        for (auto key : allUpdateKeys) {
             if (key == TorrentData::UpdateKey::Labels && !serverSettings->data().hasLabelsProperty()) {
                 continue;
             }
@@ -530,15 +532,15 @@ namespace tremotesf {
         return {};
     }
 
-    std::optional<QJsonArray::size_type> Torrent::idKeyIndex(std::span<const std::optional<TorrentData::UpdateKey>> keys
-    ) {
+    std::optional<QJsonArray::size_type>
+    Torrent::idKeyIndex(std::span<const std::optional<TorrentData::UpdateKey>> keys) {
         return indexOfCasted<QJsonArray::size_type>(keys, TorrentData::UpdateKey::Id);
     }
 
     std::vector<std::optional<TorrentData::UpdateKey>> Torrent::mapUpdateKeys(const QJsonArray& stringKeys) {
-        return toContainer<std::vector>(stringKeys | std::views::transform([](auto value) {
-                                            return mapUpdateKey(value.toString());
-                                        }));
+        return stringKeys
+               | std::views::transform([](auto value) { return mapUpdateKey(value.toString()); })
+               | std::ranges::to<std::vector>();
     }
 
     void Torrent::setDownloadSpeedLimited(bool limited) {
@@ -614,7 +616,7 @@ namespace tremotesf {
             for (const auto& tracker : trackers) {
                 tiered[tracker.id()].insert(tracker.announce());
             }
-            return moveToContainer<std::vector>(std::views::values(tiered));
+            return std::views::values(tiered) | std::views::as_rvalue | std::ranges::to<std::vector>();
         }
 
         QString toTrackerList(std::span<const std::set<QString>> tieredAnnounceUrls) {
@@ -622,7 +624,7 @@ namespace tremotesf {
             bool processedFirstTier{};
             for (const auto& tier : tieredAnnounceUrls) {
                 if (processedFirstTier) {
-                    trackerList += "\n\n"_l1;
+                    trackerList += "\n\n"_L1;
                 }
                 for (const auto& announceUrl : tier) {
                     trackerList += announceUrl;
@@ -647,8 +649,7 @@ namespace tremotesf {
                 if (tier.empty()) continue;
                 // Transmission adds each announce URL to each own tier when using trackerAdd property, so take first URL from each tier
                 const auto& first = *tier.begin();
-                const auto existingTracker = std::ranges::find(existingTrackers, first, &Tracker::announce);
-                if (existingTracker == existingTrackers.end()) {
+                if (!std::ranges::contains(existingTrackers, first, &Tracker::announce)) {
                     trackersToAdd.push_back(first);
                 }
             }
@@ -717,9 +718,8 @@ namespace tremotesf {
             return;
         }
         auto trackers = mData.trackers;
-        const auto erased = std::erase_if(trackers, [ids](const auto& tracker) {
-            return std::ranges::find(ids, tracker.id()) != ids.end();
-        });
+        const auto erased =
+            std::erase_if(trackers, [ids](const auto& tracker) { return std::ranges::contains(ids, tracker.id()); });
         if (erased == 0) {
             return;
         }
@@ -793,10 +793,10 @@ namespace tremotesf {
     void Torrent::updateFiles(const QJsonObject& torrentMap) {
         std::vector<int> changed{};
 
-        const QJsonArray fileStats = torrentMap.value("fileStats"_l1).toArray();
+        const QJsonArray fileStats = torrentMap.value("fileStats"_L1).toArray();
         if (!fileStats.isEmpty()) {
             if (mFiles.empty()) {
-                const QJsonArray fileJsons = torrentMap.value("files"_l1).toArray();
+                const QJsonArray fileJsons = torrentMap.value("files"_L1).toArray();
                 if (fileJsons.size() == fileStats.size()) {
                     const auto count = fileJsons.size();
                     mFiles.reserve(static_cast<size_t>(count));
@@ -876,12 +876,12 @@ namespace tremotesf {
     void Torrent::updatePeers(const QJsonObject& torrentMap) {
         std::vector<NewPeer> newPeers;
         {
-            const QJsonArray peers(torrentMap.value("peers"_l1).toArray());
+            const QJsonArray peers(torrentMap.value("peers"_L1).toArray());
             newPeers.reserve(static_cast<size_t>(peers.size()));
             for (const auto& i : peers) {
                 QJsonObject json = i.toObject();
                 QString address(json.value(Peer::addressKey).toString());
-                newPeers.push_back(NewPeer{std::move(json), std::move(address)});
+                newPeers.push_back(NewPeer{.json = std::move(json), .address = std::move(address)});
             }
         }
 
@@ -889,10 +889,6 @@ namespace tremotesf {
         updater.update(mPeers, std::move(newPeers));
 
         emit peersUpdated(updater.removedIndexRanges, updater.changedIndexRanges, updater.addedCount);
-    }
-
-    void Torrent::checkSingleFile(const QJsonObject& torrentMap) {
-        mData.singleFile = (torrentMap.value(prioritiesKey).toArray().size() == 1);
     }
 }
 

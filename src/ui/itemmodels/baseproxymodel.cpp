@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -10,14 +10,10 @@ namespace tremotesf {
     )
         : QSortFilterProxyModel(parent), mFallbackColumn(fallbackColumn) {
         setSourceModel(sourceModel);
-        QSortFilterProxyModel::setSortRole(sortRole);
+        setSortRole(sortRole);
         mCollator.setCaseSensitivity(Qt::CaseInsensitive);
         mCollator.setNumericMode(true);
     }
-
-    QModelIndex BaseProxyModel::sourceIndex(const QModelIndex& proxyIndex) const { return mapToSource(proxyIndex); }
-
-    QModelIndex BaseProxyModel::sourceIndex(int proxyRow) const { return mapToSource(index(proxyRow, 0)); }
 
     QModelIndexList BaseProxyModel::sourceIndexes(const QModelIndexList& proxyIndexes) const {
         QModelIndexList indexes;
@@ -28,15 +24,11 @@ namespace tremotesf {
         return indexes;
     }
 
-    void BaseProxyModel::sort(int column, Qt::SortOrder order) {
-        QSortFilterProxyModel::sort(column, order);
-        emit sortOrderChanged();
-    }
-
     bool BaseProxyModel::lessThan(const QModelIndex& source_left, const QModelIndex& source_right) const {
         std::partial_ordering ord = compare(source_left, source_right);
-        if (ord == std::partial_ordering::equivalent && mFallbackColumn.has_value() &&
-            source_left.column() != *mFallbackColumn) {
+        if (ord == std::partial_ordering::equivalent
+            && mFallbackColumn.has_value()
+            && source_left.column() != *mFallbackColumn) {
             ord =
                 compare(source_left.siblingAtColumn(*mFallbackColumn), source_right.siblingAtColumn(*mFallbackColumn));
         }
@@ -48,13 +40,13 @@ namespace tremotesf {
         const auto role = sortRole();
         const QVariant leftData = source_left.data(role);
         const QVariant rightData = source_right.data(role);
-        if (leftData.userType() == QMetaType::QString && rightData.userType() == QMetaType::QString) {
+        if (leftData.typeId() == QMetaType::QString && rightData.typeId() == QMetaType::QString) {
             return mCollator.compare(leftData.toString(), rightData.toString()) <=> 0;
         }
         if (QSortFilterProxyModel::lessThan(source_left, source_right)) {
             return std::partial_ordering::less;
         }
-        if (leftData.userType() == rightData.userType() && leftData == rightData) {
+        if (leftData.typeId() == rightData.typeId() && leftData == rightData) {
             return std::partial_ordering::equivalent;
         }
         return std::partial_ordering::unordered;

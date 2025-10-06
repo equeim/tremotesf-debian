@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -12,8 +12,9 @@ namespace tremotesf {
         Q_OBJECT
     public:
         explicit RecoloringSvgIconStyle(QObject* parent);
-        void drawControl(ControlElement element, const QStyleOption* option, QPainter* painter, const QWidget* widget)
-            const override;
+        void drawControl(
+            ControlElement element, const QStyleOption* option, QPainter* painter, const QWidget* widget
+        ) const override;
     };
 }
 

@@ -17,12 +17,13 @@
 
 #include "rpc/rpc.h"
 #include "rpc/torrent.h"
-#include "stdutils.h"
+
+using namespace Qt::StringLiterals;
 
 namespace tremotesf {
     namespace {
         const QIcon& tagIcon() {
-            static const auto icon = QIcon::fromTheme("tag"_l1);
+            static const auto icon = QIcon::fromTheme("tag"_L1);
             return icon;
         }
     }
@@ -54,13 +55,13 @@ namespace tremotesf {
         QObject::connect(mLabelsList->model(), &QAbstractItemModel::rowsRemoved, this, updateListVisibility);
 
         const auto removeAction =
-            new QAction(QIcon::fromTheme("list-remove"_l1), qApp->translate("tremotesf", "&Remove"), mLabelsList);
+            new QAction(QIcon::fromTheme("list-remove"_L1), qApp->translate("tremotesf", "&Remove"), mLabelsList);
         mLabelsList->addAction(removeAction);
         removeAction->setShortcut(QKeySequence::Delete);
         QObject::connect(removeAction, &QAction::triggered, this, [this] { qDeleteAll(mLabelsList->selectedItems()); });
 
         mLabelsList->setContextMenuPolicy(Qt::CustomContextMenu);
-        QObject::connect(mLabelsList, &QWidget::customContextMenuRequested, this, [=, this](const QPoint& pos) {
+        QObject::connect(mLabelsList, &QWidget::customContextMenuRequested, this, [=, this](QPoint pos) {
             if (mLabelsList->selectionModel()->hasSelection() && mLabelsList->indexAt(pos).isValid()) {
                 const auto menu = new QMenu(this);
                 menu->addAction(removeAction);
@@ -77,7 +78,7 @@ namespace tremotesf {
         QObject::connect(rpc, &Rpc::connectedChanged, this, &EditLabelsWidget::updateComboBoxLabels);
 
         const auto addButton =
-            new QPushButton(QIcon::fromTheme("list-add"_l1), qApp->translate("tremotesf", "Add"), this);
+            new QPushButton(QIcon::fromTheme("list-add"_L1), qApp->translate("tremotesf", "Add"), this);
         layout->addWidget(addButton, 1, 1);
         addButton->setEnabled(false);
         const auto updateButtonEnabledState = [=, this] {
@@ -117,10 +118,9 @@ namespace tremotesf {
     bool EditLabelsWidget::comboBoxHasFocus() const { return mComboBox->hasFocus(); }
 
     std::vector<QString> EditLabelsWidget::enabledLabels() const {
-        return toContainer<std::vector>(
-            std::views::iota(0, mLabelsList->count()) |
-            std::views::transform([this](int i) { return mLabelsList->item(i)->text(); })
-        );
+        return std::views::iota(0, mLabelsList->count())
+               | std::views::transform([this](int i) { return mLabelsList->item(i)->text(); })
+               | std::ranges::to<std::vector>();
     }
 
     void EditLabelsWidget::updateComboBoxLabels() {
@@ -128,9 +128,11 @@ namespace tremotesf {
         if (!mRpc->isConnected()) {
             return;
         }
-        const auto allLabels = toContainer<std::set>(
-            mRpc->torrents() | std::views::transform([](const auto& t) { return t->data().labels; }) | std::views::join
-        );
+        const auto allLabels = mRpc->torrents()
+                               | std::views::transform([](const auto& t) { return t->data().labels; })
+                               | std::views::join
+                               | std::views::common // For some reason GCC 14 requies views::common here
+                               | std::ranges::to<std::set>();
         for (const auto& label : allLabels) {
             mComboBox->addItem(tagIcon(), label);
         }

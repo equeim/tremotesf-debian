@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -9,8 +9,9 @@
 
 #include <QTabWidget>
 
+class QTreeView;
+
 namespace tremotesf {
-    class BaseTreeView;
     class PeersModel;
     class Rpc;
     class StringListModel;
@@ -43,7 +44,7 @@ namespace tremotesf {
         TorrentFilesModel* mFilesModel{};
         TorrentFilesView* mFilesView{};
         TrackersViewWidget* mTrackersViewWidget{};
-        BaseTreeView* mPeersView{};
+        QTreeView* mPeersView{};
         PeersModel* mPeersModel{};
         StringListModel* mWebSeedersModel{};
 

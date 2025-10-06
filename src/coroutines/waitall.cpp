@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -33,18 +33,18 @@ namespace tremotesf::impl {
             if (mParentCoroutinePromise) {
                 coroutine->setRootCoroutine(mParentCoroutinePromise->owningStandaloneCoroutine()->rootCoroutine());
             }
-            coroutine->setCompletionCallback([this, coroutine](std::exception_ptr unhandledException) {
-                onCoroutineCompleted(coroutine, std::move(unhandledException));
+            coroutine->setCompletionCallback([this, coroutine](const std::exception_ptr& unhandledException) {
+                onCoroutineCompleted(coroutine, unhandledException);
             });
             coroutine->start();
         }
     }
 
     void MultipleCoroutinesAwaiter::onCoroutineCompleted(
-        StandaloneCoroutine* coroutine, std::exception_ptr unhandledException
+        StandaloneCoroutine* coroutine, const std::exception_ptr& unhandledException
     ) {
         if (unhandledException && !mUnhandledException) {
-            mUnhandledException = std::move(unhandledException);
+            mUnhandledException = unhandledException;
         }
         const auto found = std::ranges::find_if(mCoroutines, [coroutine](auto& c) { return &c == coroutine; });
         if (found == mCoroutines.end()) {
@@ -57,8 +57,8 @@ namespace tremotesf::impl {
         }
         if (mCoroutines.empty()) {
             onAllCoroutinesCompleted();
-        } else if ((mUnhandledException || mCancelAfterFirst) &&
-                   !mCancelledCoroutinesAndWaitingForCompletionCallbacks) {
+        } else if ((mUnhandledException || mCancelAfterFirst)
+                   && !mCancelledCoroutinesAndWaitingForCompletionCallbacks) {
             cancelAll();
         }
     }

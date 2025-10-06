@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -29,15 +29,15 @@ namespace tremotesf {
 
     [[nodiscard]] QByteArray readFile(const QString& path);
 
-    void deleteFile(const QString &filePath);
-    void moveFileToTrashOrDelete(const QString &filePath);
+    void deleteFile(const QString& filePath);
+    void moveFileToTrashOrDelete(const QString& filePath);
 
     [[maybe_unused]]
     QString resolveExternalBundledResourcesPath(QLatin1String path);
 
     namespace impl {
         [[nodiscard]] QString readFileAsBase64String(QFile& file);
-        [[nodiscard]] bool isTransmissionSessionIdFileExists(const QByteArray& sessionId);
+        [[nodiscard]] bool isTransmissionSessionIdFileExists(QByteArrayView sessionId);
     }
 }
 

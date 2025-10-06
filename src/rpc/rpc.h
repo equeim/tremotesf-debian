@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -39,6 +39,9 @@ namespace tremotesf {
         enum class ProxyType { Default, Http, Socks5, None };
         Q_ENUM(ProxyType)
 
+        enum class ServerCertificateMode { None, SelfSigned, CustomRoot };
+        Q_ENUM(ServerCertificateMode)
+
         QString address{};
         int port{};
         QString apiPath{};
@@ -50,8 +53,11 @@ namespace tremotesf {
         QString proxyPassword{};
 
         bool https{};
-        bool selfSignedCertificateEnabled{};
-        QByteArray selfSignedCertificate{};
+
+        ServerCertificateMode serverCertificateMode{};
+        QByteArray serverRootCertificate{};
+        QByteArray serverLeafCertificate{};
+
         bool clientCertificateEnabled{};
         QByteArray clientCertificate{};
 
@@ -214,7 +220,6 @@ namespace tremotesf {
 
         Coroutine<> getServerSettings();
         Coroutine<> getTorrents();
-        Coroutine<> checkTorrentsSingleFile(std::vector<int> torrentIds);
         Coroutine<> getServerStats();
 
         Coroutine<> connectAndPerformDataUpdates();

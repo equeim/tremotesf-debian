@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2015-2024 Alexey Rochev
+// SPDX-FileCopyrightText: 2015-2025 Alexey Rochev
 // SPDX-FileCopyrightText: 2021 LuK1337
 // SPDX-FileCopyrightText: 2022 Alex <tabell@users.noreply.github.com>
 //
@@ -125,12 +125,12 @@ namespace tremotesf {
                 "Properties dialog won't be shown because torrent properties are shown in the main window"
             ));
             const auto updateDialogWarningMessage = [=] {
-                if (showTorrentPropertiesInMainWindowCheckBox->isChecked() &&
-                    torrentDoubleClickActionComboBox->currentIndex() ==
-                        indexOfCasted<int>(
-                            torrentDoubleClickActionComboBoxValues,
-                            Settings::TorrentDoubleClickAction::OpenPropertiesDialog
-                        )) {
+                if (showTorrentPropertiesInMainWindowCheckBox->isChecked()
+                    && torrentDoubleClickActionComboBox->currentIndex()
+                           == indexOfCasted<int>(
+                               torrentDoubleClickActionComboBoxValues,
+                               Settings::TorrentDoubleClickAction::OpenPropertiesDialog
+                           )) {
                     dialogWarningMessage->animatedShow();
                 } else {
                     dialogWarningMessage->animatedHide();
@@ -177,7 +177,7 @@ namespace tremotesf {
             return [=] {
 #ifdef Q_OS_WIN
                 if (const auto index = darkThemeComboBox->currentIndex(); index != -1) {
-                    settings->set_darkThemeMode(darkThemeComboBoxValues[static_cast<size_t>(index)]);
+                    settings->set_darkThemeMode(darkThemeComboBoxValues.at(static_cast<size_t>(index)));
                 }
                 if (systemAccentColorCheckBox) {
                     settings->set_useSystemAccentColor(systemAccentColorCheckBox->isChecked());
@@ -186,7 +186,7 @@ namespace tremotesf {
                 settings->set_showTorrentPropertiesInMainWindow(showTorrentPropertiesInMainWindowCheckBox->isChecked());
                 if (const auto index = torrentDoubleClickActionComboBox->currentIndex(); index != -1) {
                     settings->set_torrentDoubleClickAction(
-                        torrentDoubleClickActionComboBoxValues[static_cast<size_t>(index)]
+                        torrentDoubleClickActionComboBoxValues.at(static_cast<size_t>(index))
                     );
                 }
                 settings->set_connectOnStartup(connectOnStartupCheckBox->isChecked());
