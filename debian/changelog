@@ -2,6 +2,7 @@ tremotesf (2.9.0-1) unstable; urgency=medium
 
   * new upstream release
   * could not audit the source change, too large of a diff
+  * upgrade to Qt6
 
  -- Antoine Beaupré <anarcat@debian.org>  Mon, 06 Oct 2025 10:00:40 -0400
 
