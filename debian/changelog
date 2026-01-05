@@ -1,3 +1,9 @@
+tremotesf (2.9.1-1) unstable; urgency=medium
+
+  * new upstream release
+
+ -- Antoine Beaupré <anarcat@debian.org>  Mon, 05 Jan 2026 13:38:01 -0500
+
 tremotesf (2.9.0-1) unstable; urgency=medium
 
   * new upstream release
