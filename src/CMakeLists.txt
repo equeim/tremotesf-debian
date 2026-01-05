@@ -154,6 +154,7 @@ target_sources(tremotesf_objects
     rpc/addressutils.h
     rpc/jsonutils.h
     rpc/mounteddirectoriesutils.h
+    rpc/numbervaluerange.h
     rpc/pathutils.h
     rpc/peer.h
     rpc/qsslcertificateformatter.h
@@ -426,7 +427,7 @@ if (WIN32 OR APPLE)
         TREMOTESF_USE_BUNDLED_QT_TRANSLATIONS
         QT_STATICPLUGIN
     )
-    find_package(Qt6 ${TREMOTESF_MINIMUM_QT_VERSION} REQUIRED COMPONENTS Svg)
+    find_package(Qt6 ${TREMOTESF_MINIMUM_QT_VERSION} REQUIRED COMPONENTS GuiPrivate Svg)
     target_link_libraries(tremotesf PUBLIC Qt::GuiPrivate Qt::Svg)
     set(exclude_plugins bearer iconengines imageformats)
     if (WIN32)

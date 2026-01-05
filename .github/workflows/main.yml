@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        container-image: ['fedora:41', 'fedora:42', 'opensuse/tumbleweed:latest']
+        container-image: ['fedora:42', 'fedora:43', 'opensuse/tumbleweed:latest']
         compiler: ['gcc', 'clang']
         arch: ['x86_64', 'arm64']
         exclude:
@@ -51,7 +51,7 @@ jobs:
       run: ${{env.INSTALL_PACKAGES}} git rpm-build
 
     - name: Checkout
-      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3
       with:
         submodules: 'recursive'
 
@@ -87,7 +87,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        container-image: ['debian:13', 'ubuntu:25.04']
+        container-image: ['debian:13', 'ubuntu:25.04', 'ubuntu:25.10']
         arch: ['x86_64', 'arm64']
 
     runs-on: ubuntu-24.04${{ matrix.arch == 'arm64' && '-arm' || '' }}
@@ -102,7 +102,7 @@ jobs:
         apt-get update && DEBIAN_FRONTEND=noninteractive apt-get --no-install-recommends --assume-yes install ca-certificates git python3 cmake
 
     - name: Check out sources
-      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3
       with:
         submodules: 'recursive'
 
@@ -113,7 +113,7 @@ jobs:
         .github/workflows/make-source-archive.py --output-directory .. --debian gzip
 
     - name: Check out Debian sources
-      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3
       with:
         repository: equeim/tremotesf-debian
         path: tremotesf-debian
@@ -153,7 +153,7 @@ jobs:
         flatpak remote-add --user --if-not-exists flathub 'https://flathub.org/repo/flathub.flatpakrepo'
 
     - name: Checkout
-      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3
       with:
         submodules: 'recursive'
 
@@ -172,19 +172,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        toolchain: ['msvc', 'msvc-clang']
+        arch: ['x86_64', 'arm64']
     uses: ./.github/workflows/build-windows-msvc.yml
     with:
-      toolchain: ${{ matrix.toolchain  }}
+      arch: ${{ matrix.arch }}
 
   build-windows-mingw:
     runs-on: windows-latest
-    # https://gitlab.kitware.com/cmake/cmake/-/issues/27152
-    if: false
 
     steps:
     - name: Checkout Tremotesf
-      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3
       with:
         submodules: 'recursive'
 
@@ -220,8 +218,9 @@ jobs:
       run: |
           set -e -o pipefail
           echo '::group::Configuring CMake'
+          # cpp-httplib doesn't compile with MinGW due to missing function (GetAddrInfoExCancel) in system headers
           # ASAN + LTO causes linker crash
-          cmake -S . --preset base -D TREMOTESF_WITH_HTTPLIB=bundled -D TREMOTESF_ASAN=ON -D CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE=OFF
+          cmake -S . --preset base -D TREMOTESF_WITH_HTTPLIB=none -D TREMOTESF_ASAN=ON -D CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE=OFF
           echo '::endgroup'
           echo '::group::Building Debug'
           cmake --build --preset base-debug -v
@@ -245,7 +244,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Check out
-      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3
 
     - name: Check REUSE compliance
       run: |
